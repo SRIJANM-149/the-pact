@@ -306,7 +306,7 @@ const Dash = {
     const dark=S.theme==='dark';
 
     // Apply theme class to dashboard screen
-    $('v-dash').className=`screen t-${S.theme}`;
+    $('v-dash').className='screen active t-'+S.theme;
 
     // Header
     const myName  = esc(pact.me.name||S.user.displayName);
