@@ -1,6 +1,8 @@
 {
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/app.js",   "destination": "/app.js" },
+    { "source": "/styles.css", "destination": "/styles.css" },
     { "source": "/(.*)",     "destination": "/index.html" }
   ],
   "crons": [
