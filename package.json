@@ -1,0 +1,14 @@
+{
+  "name": "the-pact",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "db:init": "node scripts/init-db.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.43.4",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
