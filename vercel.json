@@ -1,9 +1,8 @@
 {
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/styles.css", "destination": "/styles.css" },
-    { "source": "/app.js", "destination": "/app.js" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "crons": [
     { "path": "/api/pact/archive", "schedule": "5 0 * * *" }
