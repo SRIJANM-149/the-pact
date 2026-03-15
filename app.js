@@ -49,8 +49,13 @@ function showErr(id,msg){
 }
 
 function goScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
-  $(id).classList.remove('hidden');
+  document.querySelectorAll('.screen').forEach(function(s){
+    s.classList.remove('active');
+    s.classList.add('hidden');
+  });
+  var el = $(id);
+  el.classList.remove('hidden');
+  el.classList.add('active');
 }
 
 /* ═══════════════════════════════════
@@ -147,10 +152,13 @@ const App = {
   },
 
   _fadeLoad(){
-    const ls=$('v-loading');
-    ls.style.transition='opacity .4s';
-    ls.style.opacity='0';
-    setTimeout(()=>ls.classList.add('hidden'),400);
+    var ls = $('v-loading');
+    ls.style.transition = 'opacity 0.4s';
+    ls.style.opacity = '0';
+    setTimeout(function(){
+      ls.classList.add('hidden');
+      ls.classList.remove('active');
+    }, 400);
   },
 
   async afterLogin(){
