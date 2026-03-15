@@ -5,7 +5,7 @@
 ═══════════════════════════════════ */
 const BASE     = window.location.origin;
 const TK       = 'pact_token';
-const POLL_MS  = 14_000;
+const POLL_MS  = 14000;
 
 /* ═══════════════════════════════════
    STATE
@@ -527,4 +527,11 @@ const Dash = {
 /* ═══════════════════════════════════
    BOOT
 ═══════════════════════════════════ */
-document.addEventListener('DOMContentLoaded',App.init);
+document.addEventListener('DOMContentLoaded', function(){ try{ App.init(); } catch(e){ console.error('init error:',e); document.getElementById('v-loading').style.display='none'; document.getElementById('v-auth').classList.remove('hidden'); } });
+
+// Global error fallback
+window.addEventListener('error', function(e) {
+  console.error('App error:', e.message, e.filename, e.lineno);
+  document.getElementById('v-loading').style.display = 'none';
+  document.getElementById('v-auth').classList.remove('hidden');
+});
