@@ -1,8 +1,9 @@
 {
-  "outputDirectory": "public",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)",     "destination": "/index.html" }
+    { "source": "/styles.css", "destination": "/styles.css" },
+    { "source": "/app.js", "destination": "/app.js" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
     { "path": "/api/pact/archive", "schedule": "5 0 * * *" }
