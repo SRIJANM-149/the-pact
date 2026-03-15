@@ -75,6 +75,7 @@ module.exports = async function handler(req, res) {
         pact: {
           id: pactId,
           inviteCode: pact.invite_code,
+          createdAt: pact.created_at,
           fineAmount: pact.fine_amount,
           creatorId:  pact.creator_id,
           rules:      (rules || []).map(r => r.text),
