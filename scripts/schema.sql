@@ -1,10 +1,6 @@
--- ═══════════════════════════════════════════════════
--- THE PACT — Supabase Schema
--- Paste this entire file into:
--- Supabase → SQL Editor → New query → Run
--- ═══════════════════════════════════════════════════
+-- THE PACT v6 — Points System Schema
+-- Paste into Supabase SQL Editor → Run
 
--- Users
 CREATE TABLE IF NOT EXISTS users (
   id           BIGSERIAL PRIMARY KEY,
   email        TEXT      NOT NULL UNIQUE,
@@ -13,19 +9,17 @@ CREATE TABLE IF NOT EXISTS users (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Pacts
 CREATE TABLE IF NOT EXISTS pacts (
-  id          BIGSERIAL PRIMARY KEY,
-  invite_code TEXT      NOT NULL UNIQUE,
-  creator_id  BIGINT    NOT NULL REFERENCES users(id),
-  joiner_id   BIGINT    REFERENCES users(id),
-  status      TEXT      NOT NULL DEFAULT 'pending'
+  id            BIGSERIAL PRIMARY KEY,
+  invite_code   TEXT      NOT NULL UNIQUE,
+  creator_id    BIGINT    NOT NULL REFERENCES users(id),
+  joiner_id     BIGINT    REFERENCES users(id),
+  status        TEXT      NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending','active','dissolved')),
-  fine_amount INTEGER   NOT NULL DEFAULT 100,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  points_per_rule INTEGER NOT NULL DEFAULT 10,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Pact members
 CREATE TABLE IF NOT EXISTS pact_members (
   id             BIGSERIAL PRIMARY KEY,
   pact_id        BIGINT NOT NULL REFERENCES pacts(id) ON DELETE CASCADE,
@@ -35,7 +29,6 @@ CREATE TABLE IF NOT EXISTS pact_members (
   UNIQUE (pact_id, user_id)
 );
 
--- Rules
 CREATE TABLE IF NOT EXISTS rules (
   id       BIGSERIAL PRIMARY KEY,
   pact_id  BIGINT  NOT NULL REFERENCES pacts(id) ON DELETE CASCADE,
@@ -44,21 +37,19 @@ CREATE TABLE IF NOT EXISTS rules (
   UNIQUE (pact_id, position)
 );
 
--- Daily check records
 CREATE TABLE IF NOT EXISTS daily_records (
-  id          BIGSERIAL PRIMARY KEY,
-  pact_id     BIGINT  NOT NULL REFERENCES pacts(id) ON DELETE CASCADE,
-  user_id     BIGINT  NOT NULL REFERENCES users(id),
-  date_key    DATE    NOT NULL,
-  checked     JSONB   NOT NULL DEFAULT '[]',
-  fine_amount INTEGER NOT NULL DEFAULT 0,
-  fine_paid   BOOLEAN NOT NULL DEFAULT FALSE,
-  archived    BOOLEAN NOT NULL DEFAULT FALSE,
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  id           BIGSERIAL PRIMARY KEY,
+  pact_id      BIGINT  NOT NULL REFERENCES pacts(id) ON DELETE CASCADE,
+  user_id      BIGINT  NOT NULL REFERENCES users(id),
+  date_key     DATE    NOT NULL,
+  checked      JSONB   NOT NULL DEFAULT '[]',
+  points_earned INTEGER NOT NULL DEFAULT 0,
+  perfect_day  BOOLEAN NOT NULL DEFAULT FALSE,
+  archived     BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (pact_id, user_id, date_key)
 );
 
--- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_pacts_invite     ON pacts(invite_code);
 CREATE INDEX IF NOT EXISTS idx_pacts_status     ON pacts(status);
 CREATE INDEX IF NOT EXISTS idx_members_user     ON pact_members(user_id);
