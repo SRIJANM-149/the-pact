@@ -2,54 +2,49 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0f0e17" id="theme-meta">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#fafaf9" id="theme-meta">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>The Pact</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤝</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 </head>
 <body>
-
-<!-- CANVAS BACKGROUND -->
 <canvas id="bg-canvas"></canvas>
+<div id="toast" class="toast"></div>
 
+<!-- LOADING -->
 <div id="v-loading" class="screen active">
   <div class="splash">
-    <div class="splash-ring"><div class="splash-inner">🤝</div></div>
-    <h1 class="splash-title">The Pact</h1>
-    <p class="splash-sub">Daily accountability, together.</p>
-    <div class="splash-dots"><span></span><span></span><span></span></div>
+    <div class="splash-wordmark">The Pact</div>
+    <div class="splash-tagline">Daily accountability</div>
   </div>
 </div>
 
-<div id="toast" class="toast"></div>
-
 <!-- AUTH -->
 <div id="v-auth" class="screen hidden">
-  <div class="auth-bg">
+  <div class="auth-wrap">
     <div class="auth-box">
-      <div class="auth-logo">🤝</div>
-      <h1 class="auth-title">The Pact</h1>
-      <p class="auth-sub">Accountability, enforced by friendship.</p>
+      <div class="auth-mark">The Pact</div>
       <div class="auth-tabs">
-        <button class="atab active" id="tab-in" onclick="Auth.switchTab('login')">Sign In</button>
-        <button class="atab" id="tab-up" onclick="Auth.switchTab('signup')">Sign Up</button>
+        <button class="atab active" id="tab-in" onclick="Auth.tab('login')">Sign in</button>
+        <button class="atab" id="tab-up" onclick="Auth.tab('signup')">Create account</button>
       </div>
       <div id="frm-login">
-        <input class="inp" type="email" id="l-email" placeholder="Email address" autocomplete="email"/>
+        <input class="inp" type="email" id="l-email" placeholder="Email" autocomplete="email"/>
         <input class="inp" type="password" id="l-pass" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')Auth.login()"/>
         <span class="forgot-lnk" onclick="Nav.go('forgot')">Forgot password?</span>
         <p class="ferr hidden" id="l-err"></p>
-        <button class="btn-primary" id="l-btn" onclick="Auth.login()">Sign In →</button>
+        <button class="btn-primary" id="l-btn" onclick="Auth.login()">Sign in</button>
       </div>
       <div id="frm-signup" class="hidden">
-        <input class="inp" type="text" id="s-name" placeholder="Your display name" maxlength="40"/>
-        <input class="inp" type="email" id="s-email" placeholder="Email address" autocomplete="email"/>
+        <input class="inp" type="text" id="s-name" placeholder="Display name" maxlength="40"/>
+        <input class="inp" type="email" id="s-email" placeholder="Email" autocomplete="email"/>
         <input class="inp" type="password" id="s-pass" placeholder="Password (min 6 chars)"/>
         <p class="ferr hidden" id="s-err"></p>
-        <button class="btn-primary" id="s-btn" onclick="Auth.signup()">Create Account →</button>
+        <button class="btn-primary" id="s-btn" onclick="Auth.signup()">Create account</button>
       </div>
     </div>
   </div>
@@ -57,16 +52,15 @@
 
 <!-- FORGOT -->
 <div id="v-forgot" class="screen hidden">
-  <div class="auth-bg">
+  <div class="auth-wrap">
     <div class="auth-box">
-      <div class="auth-logo">🔑</div>
-      <h2 class="auth-title" style="font-size:1.6rem">Reset Password</h2>
-      <p class="auth-sub">We'll send a reset link to your email.</p>
-      <input class="inp" type="email" id="fp-email" placeholder="Email address" onkeydown="if(event.key==='Enter')Auth.forgotPassword()"/>
+      <div class="auth-mark" style="margin-bottom:.5rem">Reset password</div>
+      <p style="font-size:.83rem;color:var(--ink3);margin-bottom:1.25rem;line-height:1.6">We'll send a link to your email.</p>
+      <input class="inp" type="email" id="fp-email" placeholder="Email" onkeydown="if(event.key==='Enter')Auth.forgot()"/>
       <p class="ferr hidden" id="fp-err"></p>
-      <p class="hidden fok" id="fp-ok"></p>
-      <button class="btn-primary" id="fp-btn" onclick="Auth.forgotPassword()">Send Reset Link →</button>
-      <button class="btn-ghost" style="margin-top:0.75rem" onclick="Nav.go('auth')">← Back to Sign In</button>
+      <p class="fok hidden" id="fp-ok"></p>
+      <button class="btn-primary" id="fp-btn" onclick="Auth.forgot()">Send reset link</button>
+      <button class="btn-outline" style="margin-top:.5rem" onclick="Nav.go('auth')">← Back</button>
     </div>
   </div>
 </div>
@@ -75,202 +69,172 @@
 <div id="v-home" class="screen hidden">
   <div class="page-shell">
     <header class="top-nav">
-      <div class="nav-logo">🤝 The Pact</div>
+      <div class="nav-logo">The Pact</div>
       <div class="nav-right">
-        <button class="theme-btn" onclick="Theme.toggle()" id="home-thm"><span class="thm-ico">🌙</span></button>
+        <button class="theme-btn" onclick="Theme.toggle()" id="home-thm"><span class="thm-ic">🌙</span></button>
         <button class="btn-ghost sm" onclick="Auth.logout()">Sign out</button>
       </div>
     </header>
     <div class="home-body">
-      <div class="home-greet">
-        <h2 class="home-hi">Hey, <span id="hi-name" class="hi-name"></span></h2>
-        <p class="home-sub">Ready to be accountable today?</p>
-      </div>
+      <div class="home-eyebrow">Welcome back</div>
+      <h1 class="home-headline"><span id="hi-name"></span></h1>
+      <p class="home-sub">Start a pact with someone you trust — then hold each other accountable, every day.</p>
       <div class="home-cards">
-        <button class="home-card card-create" onclick="Nav.go('create')">
-          <div class="hcard-icon">✦</div>
-          <div class="hcard-body">
-            <div class="hcard-title">Create a Pact</div>
-            <div class="hcard-desc">Set your rules, earn points together</div>
+        <button class="home-card" onclick="Nav.go('create')">
+          <div class="hc-left">
+            <div class="hc-eyebrow">New pact</div>
+            <div class="hc-title">Create a Pact</div>
           </div>
-          <div class="hcard-arrow">→</div>
+          <div class="hc-arrow">→</div>
         </button>
-        <button class="home-card card-join" onclick="Nav.go('join')">
-          <div class="hcard-icon">⊕</div>
-          <div class="hcard-body">
-            <div class="hcard-title">Join a Pact</div>
-            <div class="hcard-desc">Enter the code your partner shared</div>
+        <button class="home-card" onclick="Nav.go('join')">
+          <div class="hc-left">
+            <div class="hc-eyebrow">Have a code?</div>
+            <div class="hc-title">Join a Pact</div>
           </div>
-          <div class="hcard-arrow">→</div>
+          <div class="hc-arrow">→</div>
         </button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- CREATE PACT -->
+<!-- CREATE -->
 <div id="v-create" class="screen hidden">
   <div class="page-shell">
     <header class="top-nav">
       <button class="back-btn" onclick="Nav.go('home')">← Back</button>
-      <h2 class="nav-title">Create a Pact</h2>
-      <button class="theme-btn" onclick="Theme.toggle()" id="create-thm"><span class="thm-ico">🌙</span></button>
+      <span class="nav-title">Create a Pact</span>
+      <button class="theme-btn" onclick="Theme.toggle()"><span class="thm-ic">🌙</span></button>
     </header>
     <div class="create-body">
-      <div class="create-meta">
-        <div class="meta-item">
-          <label class="meta-label">Points per completed rule</label>
-          <div class="meta-ctrl">
-            <button class="ctrl-btn" onclick="CreatePact.adjPoints(-5)">−</button>
-            <span class="ctrl-val" id="c-pts-display">10</span>
-            <button class="ctrl-btn" onclick="CreatePact.adjPoints(5)">+</button>
-          </div>
-          <input type="hidden" id="c-pts" value="10"/>
+      <div class="config-card">
+        <div>
+          <div class="config-label">Points per rule completed</div>
+          <div class="config-sub">Awarded each day you tick a rule</div>
         </div>
+        <div class="pts-ctrl">
+          <button class="pts-btn" onclick="CP.adj(-5)">−</button>
+          <span class="pts-val" id="c-pts-v">10</span>
+          <button class="pts-btn" onclick="CP.adj(5)">+</button>
+        </div>
+        <input type="hidden" id="c-pts" value="10"/>
       </div>
-      <p class="section-label">Your 25 Daily Rules</p>
+      <div class="section-hd">Your 25 daily rules</div>
       <ol class="rules-ol" id="c-rules-ol"></ol>
       <p class="ferr hidden" id="c-err"></p>
-      <button class="btn-primary" id="c-btn" onclick="CreatePact.submit()">Create Pact →</button>
+      <button class="btn-primary" id="c-btn" onclick="CP.submit()">Create pact →</button>
     </div>
   </div>
 </div>
 
-<!-- INVITE CODE -->
+<!-- CODE -->
 <div id="v-code" class="screen hidden">
-  <div class="auth-bg">
-    <div class="auth-box" style="text-align:center">
-      <div class="code-confetti">🎉</div>
-      <h2 class="auth-title">Pact Created!</h2>
-      <p class="auth-sub">Share this code with your partner. They sign up and enter it to join.</p>
-      <div class="big-code" id="invite-code">——</div>
-      <div style="display:flex;gap:0.75rem;margin-top:1.25rem">
-        <button class="btn-primary" style="flex:1" onclick="Nav.copyCode()">📋 Copy Code</button>
-        <button class="btn-outline" style="flex:1" onclick="Nav.go('dashboard')">Dashboard →</button>
+  <div class="code-wrap">
+    <div class="code-box">
+      <div class="code-heading">Pact created</div>
+      <p class="code-sub">Share this code with your partner. They sign up, then enter it to join.</p>
+      <div class="code-display" id="invite-code">——</div>
+      <div class="code-actions">
+        <button class="btn-primary" style="flex:1" onclick="Nav.copyCode()" id="copy-btn">Copy code</button>
+        <button class="btn-outline" style="flex:1" onclick="Nav.go('dashboard')">Dashboard</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- JOIN PACT -->
+<!-- JOIN -->
 <div id="v-join" class="screen hidden">
   <div class="page-shell">
     <header class="top-nav">
       <button class="back-btn" onclick="Nav.go('home')">← Back</button>
-      <h2 class="nav-title">Join a Pact</h2>
-      <button class="theme-btn" onclick="Theme.toggle()" id="join-thm"><span class="thm-ico">🌙</span></button>
+      <span class="nav-title">Join a Pact</span>
+      <button class="theme-btn" onclick="Theme.toggle()"><span class="thm-ic">🌙</span></button>
     </header>
-    <div class="create-body" style="max-width:420px">
-      <p class="auth-sub" style="margin-bottom:1.5rem">Enter the 6-character code your partner shared.</p>
-      <input class="inp code-inp" id="j-code" placeholder="A3F9KX" maxlength="6"
-        oninput="this.value=this.value.toUpperCase()"
-        onkeydown="if(event.key==='Enter')JoinPact.submit()"/>
+    <div class="create-body" style="max-width:400px">
+      <p style="font-size:.85rem;color:var(--ink3);margin-bottom:1.25rem;line-height:1.6">Enter the code your partner shared with you.</p>
+      <input class="inp code-inp" id="j-code" placeholder="ABC123" maxlength="6" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')JP.submit()"/>
       <p class="ferr hidden" id="j-err"></p>
-      <button class="btn-primary" id="j-btn" onclick="JoinPact.submit()">Join Pact →</button>
+      <button class="btn-primary" id="j-btn" onclick="JP.submit()">Join pact →</button>
     </div>
   </div>
 </div>
 
 <!-- NICKNAME -->
 <div id="v-nick" class="screen hidden">
-  <div class="auth-bg">
-    <div class="auth-box" style="text-align:center">
-      <div style="font-size:2.5rem;margin-bottom:1rem">✏️</div>
-      <h2 class="auth-title" style="font-size:1.6rem">One last thing</h2>
-      <p class="auth-sub">What do you call your partner?</p>
-      <input class="inp" id="n-nick" placeholder="Their nickname…" maxlength="30" onkeydown="if(event.key==='Enter')Nickname.submit()"/>
+  <div class="auth-wrap">
+    <div class="auth-box">
+      <div class="auth-mark">One last thing</div>
+      <p style="font-size:.83rem;color:var(--ink3);margin-bottom:1.25rem;line-height:1.6">What do you call your partner? This is what you'll see on your dashboard.</p>
+      <input class="inp" id="n-nick" placeholder="Their nickname" maxlength="30" onkeydown="if(event.key==='Enter')Nick.submit()"/>
       <p class="ferr hidden" id="n-err"></p>
-      <button class="btn-primary" onclick="Nickname.submit()">Let's Go →</button>
+      <button class="btn-primary" onclick="Nick.submit()">Let's go →</button>
     </div>
   </div>
 </div>
 
 <!-- DASHBOARD -->
 <div id="v-dash" class="screen hidden">
-  <!-- Top nav -->
   <header class="dash-nav">
-    <div class="dash-nav-left">
-      <div class="dash-name" id="dh-name"></div>
-      <div class="dash-meta" id="dh-meta"></div>
+    <div>
+      <div class="dn-name" id="dn-name"></div>
+      <div class="dn-meta" id="dn-meta"></div>
     </div>
-    <div class="dash-nav-right">
-      <span class="day-badge" id="dh-day"></span>
-      <button class="theme-btn" onclick="Theme.toggle()" id="dash-thm"><span class="thm-ico">🌙</span></button>
+    <div class="dn-right">
+      <span class="day-chip" id="dn-day"></span>
+      <button class="theme-btn" onclick="Theme.toggle()" id="dash-thm"><span class="thm-ic">🌙</span></button>
       <button class="btn-ghost sm" onclick="Auth.logout()">Out</button>
     </div>
   </header>
 
   <div class="dash-body" id="dash-body">
-    <!-- Waiting state -->
-    <div id="dash-waiting" class="hidden">
-      <div class="waiting-box">
-        <div class="waiting-pulse">⏳</div>
-        <h3 class="waiting-title">Waiting for your partner</h3>
-        <p class="waiting-sub">Share this code — they sign up and enter it to join</p>
-        <div class="big-code" id="w-code" style="margin:1.25rem 0"></div>
-        <button class="btn-primary" onclick="Dash.copyInvite()">📋 Copy Code</button>
-      </div>
-    </div>
-
-    <!-- Main content -->
+    <div id="dash-waiting" class="hidden"></div>
     <div id="dash-content" class="hidden">
-      <!-- Score duel card -->
-      <div class="duel-card" id="duel-card"></div>
-
-      <!-- Streak + info row -->
-      <div class="info-row" id="info-row"></div>
-
-      <!-- Partner progress -->
-      <div class="partner-prog" id="partner-prog"></div>
-
-      <!-- Rules -->
-      <div class="rules-header">
-        <span class="rules-title">Today's Rules</span>
-        <span class="rules-count" id="rules-ct"></span>
+      <div class="score-strip" id="score-strip"></div>
+      <div class="stats-row" id="stats-row"></div>
+      <div class="partner-row" id="partner-row"></div>
+      <div class="rules-hd-row">
+        <span class="rules-hd">Today</span>
+        <span class="rules-tally" id="rules-tally"></span>
       </div>
-      <div class="prog-bar-wrap">
-        <div class="prog-bar-fill" id="prog-fill"></div>
-        <span class="prog-bar-pct" id="prog-pct">0%</span>
-      </div>
-      <div class="rules-list" id="dash-rules"></div>
+      <div class="prog-rail"><div class="prog-fill" id="prog-fill"></div></div>
+      <div class="rules-grid" id="rules-grid"></div>
     </div>
   </div>
 
-  <!-- Bottom nav -->
   <nav class="bottom-nav">
-    <button class="bnav active" id="bn-today"    onclick="Dash.tab('today')"><span>☑</span><span class="bn-l">Today</span></button>
-    <button class="bnav"        id="bn-history"  onclick="Dash.tab('history')"><span>📊</span><span class="bn-l">History</span></button>
-    <button class="bnav"        id="bn-settings" onclick="Dash.tab('settings')"><span>⚙</span><span class="bn-l">Settings</span></button>
+    <button class="bnav active" id="bn-today" onclick="Dash.tab('today')"><span class="bn-ico">☑</span><span class="bn-lbl">Today</span></button>
+    <button class="bnav" id="bn-history" onclick="Dash.tab('history')"><span class="bn-ico">◷</span><span class="bn-lbl">History</span></button>
+    <button class="bnav" id="bn-settings" onclick="Dash.tab('settings')"><span class="bn-ico">⋯</span><span class="bn-lbl">Settings</span></button>
   </nav>
 
-  <!-- History panel -->
   <div id="pan-history" class="side-panel hidden">
-    <div class="panel-nav"><h3 class="panel-title">History</h3><button class="pan-close" onclick="Dash.tab('today')">✕</button></div>
+    <div class="panel-nav"><span class="panel-heading">History</span><button class="pan-close" onclick="Dash.tab('today')">Close</button></div>
     <div class="panel-body" id="hist-body"></div>
   </div>
 
-  <!-- Settings panel -->
   <div id="pan-settings" class="side-panel hidden">
-    <div class="panel-nav"><h3 class="panel-title">Settings</h3><button class="pan-close" onclick="Dash.tab('today')">✕</button></div>
+    <div class="panel-nav"><span class="panel-heading">Settings</span><button class="pan-close" onclick="Dash.tab('today')">Close</button></div>
     <div class="panel-body">
       <div class="setting-group">
-        <label class="setting-label">Nickname for partner</label>
+        <label class="setting-label">Partner nickname</label>
         <div class="setting-row">
-          <input class="inp" id="set-nick" placeholder="Their nickname…" maxlength="30" style="margin:0;flex:1"/>
+          <input class="inp" id="set-nick" placeholder="Their nickname" maxlength="30" style="margin:0;flex:1"/>
           <button class="btn-sm" onclick="Dash.saveNick()">Save</button>
         </div>
       </div>
       <div class="setting-group" id="rules-edit-sec">
-        <label class="setting-label">Edit Rules <span class="label-note">(creator only)</span></label>
+        <label class="setting-label">Edit rules <span style="font-size:.68rem;color:var(--ink3);text-transform:none;letter-spacing:0">(creator only)</span></label>
         <ol class="rules-ol small" id="set-rules-ol"></ol>
-        <button class="btn-sm" style="margin-top:0.75rem;width:100%" onclick="Dash.saveRules()">Save Rules</button>
+        <button class="btn-sm" style="margin-top:.75rem;width:100%" onclick="Dash.saveRules()">Save rules</button>
       </div>
-      <div class="setting-group danger-group">
-        <label class="setting-label danger-label">Danger Zone</label>
-        <button class="btn-danger" onclick="Dash.leave()">Leave Pact</button>
+      <div class="setting-group">
+        <label class="setting-label" style="color:var(--red)">Leave pact</label>
+        <p style="font-size:.8rem;color:var(--ink3);margin-bottom:.75rem;line-height:1.5">This dissolves the pact for both people and cannot be undone.</p>
+        <button class="btn-danger" onclick="Dash.leave()">Leave pact</button>
       </div>
       <div class="setting-group" style="padding-bottom:2rem">
-        <button class="btn-ghost" style="width:100%" onclick="Auth.logout()">Sign Out</button>
+        <button class="btn-outline" onclick="Auth.logout()">Sign out</button>
       </div>
     </div>
   </div>
