@@ -35,8 +35,8 @@ module.exports = async function handler(req, res) {
       const myRec = todayRecs && todayRecs.find(r => r.user_id === uid);
       const ptRec = partner && todayRecs && todayRecs.find(r => r.user_id === partner.user_id);
 
-      const { data: myHist } = await supabase.from('daily_records').select('points_earned, perfect_day').eq('pact_id', pactId).eq('user_id', uid).eq('archived', true);
-      const { data: ptHist } = partner ? await supabase.from('daily_records').select('points_earned, perfect_day').eq('pact_id', pactId).eq('user_id', partner.user_id).eq('archived', true) : { data: [] };
+      const { data: myHist } = await supabase.from('daily_records').select('points_earned, perfect_day, date_key').eq('pact_id', pactId).eq('user_id', uid).eq('archived', true).order('date_key', { ascending: true });
+      const { data: ptHist } = partner ? await supabase.from('daily_records').select('points_earned, perfect_day, date_key').eq('pact_id', pactId).eq('user_id', partner.user_id).eq('archived', true).order('date_key', { ascending: true }) : { data: [] };
 
       const myTotal   = (myHist||[]).reduce((s,r)=>s+(r.points_earned||0),0);
       const ptTotal   = (ptHist||[]).reduce((s,r)=>s+(r.points_earned||0),0);
@@ -50,12 +50,41 @@ module.exports = async function handler(req, res) {
       const myMem = members && members.find(m => m.user_id === uid);
       const { data: myUser } = await supabase.from('users').select('display_name').eq('id', uid).single();
 
+      // NICKNAME FIX:
+      // myMem.nickname_given = nickname I gave TO my partner (shown on partner's side)
+      // partner.nickname_given = nickname partner gave TO me (shown as my label)
+      const myDisplayName   = myUser && myUser.display_name || '';
+      const myNicknameFromPartner = partner && partner.nickname_given || ''; // what partner calls me
+      const nickIGavePartner      = myMem && myMem.nickname_given || '';     // what I call partner
+
       res.json({ pact: {
         id: pactId, inviteCode: pact.invite_code, pointsPerRule: pact.points_per_rule,
         createdAt: pact.created_at, creatorId: pact.creator_id,
         rules: (rules||[]).map(r=>r.text),
-        me: { userId:uid, name:myUser&&myUser.display_name||'', role:myMem&&myMem.role||'creator', nickname:myMem&&myMem.nickname_given||'', today:(myRec&&myRec.checked)||[], totalPoints:myTotal, perfectDays:myPerfect, streak },
-        partner: partner ? { userId:partner.user_id, name:partner.users&&partner.users.display_name||'', role:partner.role, nickname:partner.nickname_given||'', today:(ptRec&&ptRec.checked)||[], totalPoints:ptTotal, perfectDays:ptPerfect } : null,
+        me: {
+          userId:      uid,
+          name:        myDisplayName,
+          // nicknameGivenByPartner = what my partner calls me (shown in their dashboard)
+          // we send it so I can see what my partner named me in settings
+          nicknameFromPartner: myNicknameFromPartner,
+          role:        myMem&&myMem.role||'creator',
+          today:       (myRec&&myRec.checked)||[],
+          totalPoints: myTotal,
+          perfectDays: myPerfect,
+          streak,
+          history:     (myHist||[]).map(r=>({ date: String(r.date_key).slice(0,10), pts: r.points_earned||0, perfect: r.perfect_day })),
+        },
+        partner: partner ? {
+          userId:      partner.user_id,
+          name:        partner.users && partner.users.display_name || '',
+          // nickname I gave to partner (what I call them)
+          nickname:    nickIGavePartner,
+          role:        partner.role,
+          today:       (ptRec&&ptRec.checked)||[],
+          totalPoints: ptTotal,
+          perfectDays: ptPerfect,
+          history:     (ptHist||[]).map(r=>({ date: String(r.date_key).slice(0,10), pts: r.points_earned||0, perfect: r.perfect_day })),
+        } : null,
         today,
       }});
     } catch (e) { console.error('[GET /api/pact]', e.message); err(res, 500, 'Server error.'); }
