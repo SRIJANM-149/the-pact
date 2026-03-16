@@ -3,7 +3,7 @@
 const BASE    = window.location.origin;
 const TK      = 'pact_token';
 const DK      = 'pact_dark';
-const POLL_MS = 14000;
+const POLL_MS = 12000;
 
 const S = { token:null,user:null,pact:null,role:null,_poll:null,_tab:'today' };
 
@@ -11,21 +11,22 @@ var $ = function(id){ return document.getElementById(id); };
 function tx(id,v){ $(id).textContent=v; }
 function hm(id,v){ $(id).innerHTML=v; }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fmtDate(k){ return new Date(String(k).slice(0,10)+'T12:00:00Z').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); }
+function fmtDate(k){
+  return new Date(String(k).slice(0,10)+'T12:00:00Z')
+    .toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
+}
 
 var _tt;
 function toast(msg,type,ms){
-  type=type||'';ms=ms||2800;
+  type=type||'';ms=ms||2500;
   var el=$('toast');el.textContent=msg;el.className='toast show'+(type?' '+type:'');
   clearTimeout(_tt);_tt=setTimeout(function(){el.className='toast';},ms);
 }
 function showErr(id,msg){var el=$(id);el.textContent=msg||'';el.classList.toggle('hidden',!msg);}
-
 function goScreen(id){
   document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');s.classList.add('hidden');});
   var el=$(id);el.classList.remove('hidden');el.classList.add('active');
 }
-
 async function api(method,path,body){
   var h={'Content-Type':'application/json'};
   if(S.token) h['Authorization']='Bearer '+S.token;
@@ -35,35 +36,76 @@ async function api(method,path,body){
   return data;
 }
 
-/* ── THEME ── */
-var Theme = {
-  init:function(){
-    if(localStorage.getItem(DK)==='1') document.body.classList.add('dark');
-    Theme._updateToggles();
+/* ══ ANIMATED BACKGROUND ══ */
+var BG = {
+  canvas: null, ctx: null, particles: [], raf: null,
+  init: function(){
+    this.canvas = $('bg-canvas');
+    if(!this.canvas) return;
+    this.ctx = this.canvas.getContext('2d');
+    this.resize();
+    window.addEventListener('resize', BG.resize.bind(BG));
+    for(var i=0;i<28;i++) this.particles.push(this.newParticle());
+    this.loop();
   },
-  toggle:function(){
-    document.body.classList.toggle('dark');
-    localStorage.setItem(DK, document.body.classList.contains('dark')?'1':'0');
-    Theme._updateToggles();
+  resize: function(){
+    if(!this.canvas) return;
+    this.canvas.width  = window.innerWidth;
+    this.canvas.height = window.innerHeight;
   },
-  isDark:function(){ return document.body.classList.contains('dark'); },
-  _updateToggles:function(){
-    var dark=Theme.isDark();
-    var icon=dark?'☀️':'🌙';
-    var txt=dark?'Light':'Dark';
-    document.querySelectorAll('.dark-toggle').forEach(function(btn){
-      var iconEl=btn.querySelector('.toggle-icon');
-      var txtEl=btn.querySelector('.toggle-txt');
-      if(iconEl) iconEl.textContent=icon;
-      if(txtEl) txtEl.textContent=txt;
+  newParticle: function(){
+    var dark = document.body.classList.contains('dark');
+    return {
+      x: Math.random()*window.innerWidth,
+      y: Math.random()*window.innerHeight,
+      r: Math.random()*3+1,
+      dx: (Math.random()-.5)*.35,
+      dy: (Math.random()-.5)*.35,
+      o: Math.random()*.5+.1,
+      hue: dark ? (Math.random()*60+240) : (Math.random()*60+220),
+    };
+  },
+  loop: function(){
+    var c=this.ctx, w=this.canvas.width, h=this.canvas.height;
+    var dark=document.body.classList.contains('dark');
+    c.clearRect(0,0,w,h);
+    this.particles.forEach(function(p){
+      p.x+=p.dx; p.y+=p.dy;
+      if(p.x<-10) p.x=w+10;
+      if(p.x>w+10) p.x=-10;
+      if(p.y<-10) p.y=h+10;
+      if(p.y>h+10) p.y=-10;
+      var alpha = dark ? p.o*.6 : p.o*.35;
+      c.beginPath();
+      c.arc(p.x,p.y,p.r,0,Math.PI*2);
+      c.fillStyle='hsla('+p.hue+',70%,70%,'+alpha+')';
+      c.fill();
     });
-    // update theme-color meta
-    var meta=$('theme-meta');
-    if(meta) meta.setAttribute('content', dark?'#0d1b2a':'#faf8f4');
+    BG.raf = requestAnimationFrame(BG.loop.bind(BG));
   },
 };
 
-/* ── AUTH ── */
+/* ══ THEME ══ */
+var Theme = {
+  init: function(){
+    if(localStorage.getItem(DK)==='1') document.body.classList.add('dark');
+    Theme._sync();
+  },
+  toggle: function(){
+    document.body.classList.toggle('dark');
+    localStorage.setItem(DK, document.body.classList.contains('dark')?'1':'0');
+    Theme._sync();
+  },
+  _sync: function(){
+    var dark=document.body.classList.contains('dark');
+    var icon=dark?'☀️':'🌙';
+    document.querySelectorAll('.thm-ico').forEach(function(el){el.textContent=icon;});
+    var meta=$('theme-meta');
+    if(meta) meta.setAttribute('content', dark?'#0f0e17':'#fafafa');
+  },
+};
+
+/* ══ AUTH ══ */
 var Auth={
   switchTab:function(t){
     $('tab-in').classList.toggle('active',t==='login');
@@ -93,7 +135,7 @@ var Auth={
     try{
       await api('POST','/api/auth/forgot',{email:email});
       showErr('fp-err','');
-      var ok=$('fp-ok');ok.textContent='Reset link sent! Check your email.';ok.classList.remove('hidden');
+      var ok=$('fp-ok');ok.textContent='✓ Reset link sent! Check your inbox.';ok.classList.remove('hidden');
     }catch(e){showErr('fp-err',e.message);}
     finally{btn.disabled=false;btn.textContent='Send Reset Link →';}
   },
@@ -105,10 +147,11 @@ var Auth={
   },
 };
 
-/* ── APP BOOT ── */
+/* ══ APP ══ */
 var App={
   init:async function(){
     Theme.init();
+    BG.init();
     var saved=localStorage.getItem(TK);
     if(saved){
       S.token=saved;
@@ -118,7 +161,7 @@ var App={
     App._fadeLoad();goScreen('v-auth');
   },
   _fadeLoad:function(){
-    var ls=$('v-loading');ls.style.transition='opacity 0.4s';ls.style.opacity='0';
+    var ls=$('v-loading');ls.style.transition='opacity .4s';ls.style.opacity='0';
     setTimeout(function(){ls.classList.add('hidden');ls.classList.remove('active');},400);
   },
   afterLogin:async function(){
@@ -129,7 +172,7 @@ var App={
   },
 };
 
-/* ── NAV ── */
+/* ══ NAV ══ */
 var Nav={
   go:function(screen){
     if(screen==='home'){tx('hi-name',S.user&&S.user.displayName||'');goScreen('v-home');return;}
@@ -140,35 +183,41 @@ var Nav={
     if(screen==='dashboard'){Dash.render();Dash.startPoll();goScreen('v-dash');return;}
   },
   copyCode:function(){
-    var code=$('invite-code').textContent,btn=$('copy-btn');
-    if(navigator.clipboard){navigator.clipboard.writeText(code).then(function(){toast('Code copied! 📋','success');});}
-    else{var el=document.createElement('textarea');el.value=code;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);toast('Code copied!','success');}
-    btn.textContent='✓ Copied';setTimeout(function(){btn.textContent='Copy';},2000);
+    var code=$('invite-code').textContent;
+    if(navigator.clipboard){navigator.clipboard.writeText(code).then(function(){toast('Invite code copied! 📋','success');});}
+    else{var el=document.createElement('textarea');el.value=code;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);toast('Copied!','success');}
+    var btn=document.querySelector('#v-code .btn-primary');
+    if(btn){btn.textContent='✓ Copied!';setTimeout(function(){btn.textContent='📋 Copy Code';},2000);}
   },
 };
 
-/* ── CREATE PACT ── */
+/* ══ CREATE PACT ══ */
 var CreatePact={
+  _pts:10,
   open:function(){
+    this._pts=10;tx('c-pts-display','10');$('c-pts').value='10';
     var ol=$('c-rules-ol');ol.innerHTML='';
-    for(var i=1;i<=25;i++){var li=document.createElement('li');li.innerHTML='<input class="ri field" id="cr-'+i+'" placeholder="Rule '+i+'…" maxlength="120"/>';ol.appendChild(li);}
-    showErr('c-err','');var btn=$('c-btn');btn.disabled=false;btn.textContent='Create & Get Invite Code →';goScreen('v-create');
+    for(var i=1;i<=25;i++){var li=document.createElement('li');li.innerHTML='<input class="ri" id="cr-'+i+'" placeholder="Rule '+i+'…" maxlength="120"/>';ol.appendChild(li);}
+    showErr('c-err','');var btn=$('c-btn');btn.disabled=false;btn.textContent='Create Pact →';goScreen('v-create');
+  },
+  adjPoints:function(delta){
+    this._pts=Math.max(5,Math.min(100,this._pts+delta));
+    tx('c-pts-display',this._pts);$('c-pts').value=this._pts;
   },
   submit:async function(){
     var rules=Array.from(document.querySelectorAll('#c-rules-ol .ri')).map(function(i){return i.value.trim();}).filter(Boolean);
     if(!rules.length){showErr('c-err','Add at least 1 rule.');return;}
-    var fine=parseInt($('c-fine').value)||100;
     var btn=$('c-btn');btn.disabled=true;btn.textContent='Creating…';
     try{
-      var d=await api('POST','/api/pact/create',{rules:rules,fineAmount:fine});
+      var d=await api('POST','/api/pact/create',{rules:rules,pointsPerRule:this._pts});
       $('invite-code').textContent=d.inviteCode;S.role='creator';
       api('GET','/api/pact').then(function(r){if(r.pact)S.pact=r.pact;}).catch(function(){});
       goScreen('v-code');
-    }catch(e){showErr('c-err',e.message);btn.disabled=false;btn.textContent='Create & Get Invite Code →';}
+    }catch(e){showErr('c-err',e.message);btn.disabled=false;btn.textContent='Create Pact →';}
   },
 };
 
-/* ── JOIN PACT ── */
+/* ══ JOIN PACT ══ */
 var JoinPact={
   submit:async function(){
     var code=$('j-code').value.trim().toUpperCase();
@@ -179,7 +228,7 @@ var JoinPact={
   },
 };
 
-/* ── NICKNAME ── */
+/* ══ NICKNAME ══ */
 var Nickname={
   submit:async function(){
     var nick=$('n-nick').value.trim();
@@ -189,86 +238,184 @@ var Nickname={
   },
 };
 
-function daysBetween(dateStr){
-  if(!dateStr)return 0;
-  return Math.floor((Date.now()-new Date(String(dateStr).slice(0,10)+'T00:00:00Z'))/(86400000));
-}
-function calcStreak(history,userId){
-  var keys=Object.keys(history).sort().reverse(),streak=0;
-  for(var i=0;i<keys.length;i++){var day=history[keys[i]];if(day[userId]&&day[userId].fineAmount===0)streak++;else break;}
-  return streak;
+/* ══ HELPERS ══ */
+function daysBetween(ds){
+  if(!ds)return 0;
+  return Math.floor((Date.now()-new Date(String(ds).slice(0,10)+'T00:00:00Z'))/86400000);
 }
 
-/* ── DASHBOARD ── */
+/* ══ DASHBOARD ══ */
 var Dash={
   _history:{},
+  _renderCount:0,
 
   render:function(){
     if(!S.pact)return;
+    this._renderCount++;
     var pact=S.pact;
     $('v-dash').className='screen active';
 
     // Header
     tx('dh-name', pact.me.name||S.user.displayName);
-    var ptLabel=pact.partner?('vs '+(pact.partner.nickname||pact.partner.name)):'Waiting for partner…';
+    var ptLabel=pact.partner?('vs '+(pact.partner.nickname||pact.partner.name)):'No partner yet';
     tx('dh-meta', new Date().toDateString().toUpperCase()+' · '+ptLabel);
-    tx('dh-age', 'Day '+(daysBetween(pact.createdAt)+1));
+    tx('dh-day', 'Day '+(daysBetween(pact.createdAt)+1));
 
     // Waiting state
     var waiting=$('dash-waiting'),content=$('dash-content');
     if(!pact.partner){
       waiting.classList.remove('hidden');content.classList.add('hidden');
       hm('dash-waiting',
-        '<div class="waiting-card">'+
-          '<div class="waiting-ico">⏳</div>'+
-          '<div class="waiting-ttl">Waiting for your partner</div>'+
-          '<p class="waiting-sub">Share this code with them. They sign up, then enter it to join your pact.</p>'+
-          '<div class="waiting-code">'+esc(pact.inviteCode)+'</div><br>'+
-          '<button class="waiting-copy" onclick="Dash.copyInvite()">Copy Invite Code</button>'+
+        '<div class="waiting-box">'+
+          '<div class="waiting-pulse">⏳</div>'+
+          '<h3 class="waiting-title">Waiting for your partner</h3>'+
+          '<p class="waiting-sub">Share this code — they sign up, then enter it to join</p>'+
+          '<div class="big-code" style="margin:1.25rem 0">'+esc(pact.inviteCode)+'</div>'+
+          '<button class="btn-primary" onclick="Dash.copyInvite()">📋 Copy Invite Code</button>'+
         '</div>'
       );
       return;
     }
     waiting.classList.add('hidden');content.classList.remove('hidden');
 
-    var me=pact.me,partner=pact.partner;
-    var total=pact.rules.length,myChk=me.today.length,ptChk=partner.today.length;
+    var me=pact.me, pt=pact.partner;
+    var total=pact.rules.length, myChk=me.today.length, ptChk=pt.today.length;
     var pct=total>0?Math.round(myChk/total*100):0;
     var ptPct=total>0?Math.round(ptChk/total*100):0;
-    var streak=calcStreak(Dash._history,me.userId);
+    var ppr=pact.pointsPerRule||10;
+    var myTodayPts=myChk*ppr, ptTodayPts=ptChk*ppr;
+    var myAllTime=me.totalPoints+myTodayPts, ptAllTime=pt.totalPoints+ptTodayPts;
 
-    hm('dash-stats',
-      '<div class="stat-card"><div class="s-lbl">Today</div><div class="s-val">'+myChk+'/'+total+'</div></div>'+
-      '<div class="stat-card"><div class="s-lbl">My Fines</div><div class="s-val red">₹'+me.owed+'</div></div>'+
-      '<div class="stat-card"><div class="s-lbl">I Earn</div><div class="s-val grn">₹'+partner.owed+'</div></div>'+
-      '<div class="stat-card"><div class="s-lbl">Perfect</div><div class="s-val">'+me.perfect+'</div></div>'
-    );
-    hm('dash-info-bar',
-      '<div class="fine-bar">'+
-        '<span>Fine per missed day: <strong>₹'+pact.fineAmount+'</strong></span>'+
-        (streak>0?'<span class="streak-badge">🔥 '+streak+' day streak</span>':'<span class="streak-badge">⭐ '+me.perfect+' perfect days</span>')+
+    // Duel card
+    var myLead=myAllTime>ptAllTime, tied=myAllTime===ptAllTime;
+    hm('duel-card',
+      '<div class="duel-row">'+
+        '<div class="duel-player">'+
+          '<div class="duel-name">'+esc(me.name||'You')+'</div>'+
+          '<div class="duel-pts'+((!tied&&myLead)?' leading':'')+'">'+myAllTime+'</div>'+
+          '<div class="duel-pts-label">total pts</div>'+
+          '<div class="duel-today">+'+myTodayPts+' today</div>'+
+        '</div>'+
+        '<div class="duel-vs">'+(tied?'TIE':(myLead?'▲':'▼'))+'</div>'+
+        '<div class="duel-player">'+
+          '<div class="duel-name">'+esc(pt.nickname||pt.name)+'</div>'+
+          '<div class="duel-pts'+((!tied&&!myLead)?' leading':'')+'">'+ptAllTime+'</div>'+
+          '<div class="duel-pts-label">total pts</div>'+
+          '<div class="duel-today">+'+ptTodayPts+' today</div>'+
+        '</div>'+
       '</div>'
     );
-    hm('dash-partner-bar',
-      '<div class="partner-bar">'+
-        '<span class="pb-name">'+esc(partner.nickname||partner.name)+'</span>'+
-        '<div class="pb-track"><div class="pb-fill'+(ptPct===100?' done':'')+'" style="width:'+ptPct+'%"></div></div>'+
-        '<span class="pb-ct">'+ptChk+'/'+total+'</span>'+
+
+    // Info chips
+    hm('info-row',
+      '<div class="info-chip streak">'+
+        '<span>🔥</span>'+
+        '<div><div class="chip-val">'+me.streak+'</div><div style="font-size:.68rem">day streak</div></div>'+
+      '</div>'+
+      '<div class="info-chip perfect">'+
+        '<span>⭐</span>'+
+        '<div><div class="chip-val">'+me.perfectDays+'</div><div style="font-size:.68rem">perfect days</div></div>'+
+      '</div>'+
+      '<div class="info-chip">'+
+        '<span>💎</span>'+
+        '<div><div class="chip-val">'+ppr+'</div><div style="font-size:.68rem">pts/rule</div></div>'+
       '</div>'
     );
+
+    // Partner progress
+    hm('partner-prog',
+      '<span class="pp-name">'+esc(pt.nickname||pt.name)+'</span>'+
+      '<div class="pp-track"><div class="pp-fill'+(ptPct===100?' done':'')+'" style="width:'+ptPct+'%"></div></div>'+
+      '<span class="pp-ct">'+ptChk+'/'+total+'</span>'
+    );
+
+    // Progress bar
     $('prog-fill').style.width=pct+'%';
-    tx('rules-ct',myChk+' / '+total);
+    tx('rules-ct', myChk+' / '+total);
+    tx('prog-pct', pct+'%');
 
-    var grid=$('dash-rules');grid.innerHTML='';
-    pact.rules.forEach(function(rule,i){
-      var done=me.today.includes(i);
-      var div=document.createElement('div');
-      div.className='rrow'+(done?' done':'');
-      div.innerHTML='<input type="checkbox" '+(done?'checked':'')+'/>'+
-        '<span class="rtxt">'+esc(rule)+'</span>';
-      div.querySelector('input').addEventListener('change',function(e){Dash.tick(i,e.target.checked,div);});
-      div.addEventListener('click',function(e){if(e.target.tagName!=='INPUT')div.querySelector('input').click();});
-      grid.appendChild(div);
+    // Rules — preserve existing DOM where possible for smooth feel
+    Dash._renderRules(pact, me, ppr);
+  },
+
+  _renderRules:function(pact, me, ppr){
+    var grid=$('dash-rules');
+    // On first render build from scratch, on update only toggle classes (instant feel)
+    if(this._renderCount===1 || grid.children.length !== pact.rules.length){
+      grid.innerHTML='';
+      pact.rules.forEach(function(rule,i){
+        var done=me.today.includes(i);
+        var div=document.createElement('div');
+        div.className='rule-row'+(done?' done':'');
+        div.dataset.i=i;
+        div.innerHTML=
+          '<div class="rule-check"><span class="rule-check-icon">✓</span></div>'+
+          '<span class="rtxt">'+esc(rule)+'</span>';
+        div.addEventListener('click',function(){Dash.tick(i,!me.today.includes(i),div,ppr);});
+        grid.appendChild(div);
+      });
+    } else {
+      // Just update classes without rebuilding — instant visual feedback
+      var rows=grid.querySelectorAll('.rule-row');
+      rows.forEach(function(div){
+        var i=parseInt(div.dataset.i);
+        var done=me.today.includes(i);
+        div.classList.toggle('done', done);
+      });
+    }
+  },
+
+  /* INSTANT TICK — optimistic update first, API call second */
+  tick:function(idx, checked, el, ppr){
+    // 1. Immediate visual update (no waiting for API)
+    el.classList.toggle('done', checked);
+    if(checked){
+      el.classList.add('just-ticked');
+      setTimeout(function(){el.classList.remove('just-ticked');},400);
+      // Points pop
+      var pop=document.createElement('div');
+      pop.className='pts-pop';
+      pop.textContent='+'+ppr+'pts';
+      el.appendChild(pop);
+      setTimeout(function(){if(pop.parentNode)pop.parentNode.removeChild(pop);},700);
+    }
+
+    // 2. Update local state immediately
+    if(checked && !S.pact.me.today.includes(idx)) S.pact.me.today.push(idx);
+    else if(!checked) S.pact.me.today=S.pact.me.today.filter(function(i){return i!==idx;});
+
+    // 3. Update progress bar and count immediately
+    var total=S.pact.rules.length, myChk=S.pact.me.today.length;
+    var pct=total>0?Math.round(myChk/total*100):0;
+    $('prog-fill').style.width=pct+'%';
+    tx('rules-ct', myChk+' / '+total);
+    tx('prog-pct', pct+'%');
+
+    // 4. Duel score update
+    var ppr2=S.pact.pointsPerRule||10;
+    var myTodayPts=myChk*ppr2;
+    var ptChk=(S.pact.partner&&S.pact.partner.today.length)||0;
+    var ptTodayPts=ptChk*ppr2;
+    var myAllTime=S.pact.me.totalPoints+myTodayPts;
+    var ptAllTime=(S.pact.partner&&S.pact.partner.totalPoints||0)+ptTodayPts;
+    // Update duel pts displays
+    var duelPts=document.querySelectorAll('.duel-pts');
+    if(duelPts[0]) duelPts[0].textContent=myAllTime;
+    var duelToday=document.querySelectorAll('.duel-today');
+    if(duelToday[0]) duelToday[0].textContent='+'+myTodayPts+' today';
+
+    // 5. Fire API in background — no await, no spinner
+    api('POST','/api/pact/tick',{ruleIndex:idx,checked:checked}).catch(function(){
+      // Rollback on failure
+      if(checked) S.pact.me.today=S.pact.me.today.filter(function(i){return i!==idx;});
+      else if(!S.pact.me.today.includes(idx)) S.pact.me.today.push(idx);
+      el.classList.toggle('done',!checked);
+      toast('Could not save — check your connection','error');
+      // Re-render correct state
+      var total2=S.pact.rules.length, myChk2=S.pact.me.today.length;
+      var pct2=total2>0?Math.round(myChk2/total2*100):0;
+      $('prog-fill').style.width=pct2+'%';
+      tx('rules-ct', myChk2+' / '+total2);
     });
   },
 
@@ -276,13 +423,7 @@ var Dash={
     if(!S.pact)return;
     var code=S.pact.inviteCode;
     if(navigator.clipboard){navigator.clipboard.writeText(code).then(function(){toast('Invite code copied! 📋','success');});}
-    else{var el=document.createElement('textarea');el.value=code;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);toast('Code copied!','success');}
-  },
-
-  tick:async function(idx,checked,el){
-    el.classList.add('busy');
-    try{var d=await api('POST','/api/pact/tick',{ruleIndex:idx,checked:checked});S.pact.me.today=d.checked;Dash.render();}
-    catch(e){toast('Save failed — check your connection','error');var cb=el.querySelector('input');if(cb)cb.checked=!checked;el.classList.remove('busy');}
+    else{var el=document.createElement('textarea');el.value=code;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);toast('Copied!','success');}
   },
 
   tab:function(t){
@@ -298,31 +439,34 @@ var Dash={
     try{
       var d=await api('GET','/api/pact/history');Dash._history=d.history;
       var hist=d.history,keys=Object.keys(hist).sort().reverse();
-      var me=S.pact.me,partner=S.pact.partner,myId=me.userId,ptId=partner&&partner.userId;
+      var me=S.pact.me,pt=S.pact.partner,myId=me.userId,ptId=pt&&pt.userId;
       if(!keys.length){hb.innerHTML='<p style="color:var(--muted);font-size:.83rem;padding:.5rem 0">No history yet — check back after midnight.</p>';return;}
-      var t='<table class="htbl"><thead><tr><th>Date</th><th>'+esc(me.name||'Me')+'</th><th>Fine</th><th>'+esc((partner&&(partner.nickname||partner.name))||'Partner')+'</th><th>Fine</th></tr></thead><tbody>';
+
+      var html='';
       keys.forEach(function(k){
-        var row=hist[k],m=row[myId]||{checked:0,total:25,fineAmount:0,finePaid:false},p=ptId?(row[ptId]||{checked:0,total:25,fineAmount:0,finePaid:false}):null;
-        t+='<tr><td style="font-family:var(--mono);font-size:.68rem;white-space:nowrap">'+fmtDate(k)+'</td>'+
-          '<td>'+m.checked+'/'+m.total+' <span class="bdg '+(m.fineAmount===0?'bdg-ok':'bdg-fine')+'">'+(m.fineAmount===0?'✓':'miss')+'</span></td>'+
-          '<td>'+Dash._fCell(k,myId,m)+'</td>'+
-          '<td>'+(p?p.checked+'/'+p.total+' <span class="bdg '+(p.fineAmount===0?'bdg-ok':'bdg-fine')+'">'+(p.fineAmount===0?'✓':'miss')+'</span>':'—')+'</td>'+
-          '<td>'+(p?Dash._fCell(k,ptId,p):'—')+'</td></tr>';
+        var row=hist[k];
+        var m=row[myId]||{checked:0,total:25,points:0,perfect:false};
+        var p=ptId?(row[ptId]||{checked:0,total:25,points:0,perfect:false}):null;
+
+        function badge(r){
+          if(r.perfect) return '<span class="hist-badge hb-perfect">⭐ Perfect</span>';
+          if(r.checked>=Math.ceil(r.total*0.8)) return '<span class="hist-badge hb-good">✓ '+r.checked+'/'+r.total+'</span>';
+          return '<span class="hist-badge hb-miss">'+r.checked+'/'+r.total+'</span>';
+        }
+
+        html+='<div class="hist-day">'+
+          '<div class="hist-date">'+fmtDate(k)+'</div>'+
+          '<div class="hist-row">'+
+            '<div class="hist-player">'+esc(me.name||'You')+' '+badge(m)+'</div>'+
+            '<div class="hist-pts">+'+m.points+'pts</div>'+
+          '</div>'+
+          (p?'<div class="hist-row">'+
+            '<div class="hist-player">'+esc((pt&&(pt.nickname||pt.name))||'Partner')+' '+badge(p)+'</div>'+
+            '<div class="hist-pts" style="color:var(--muted)">+'+p.points+'pts</div>'+
+          '</div>':'')+'</div>';
       });
-      hb.innerHTML=t+'</tbody></table>';
+      hb.innerHTML=html;
     }catch(e){hb.innerHTML='<p style="color:var(--red);font-size:.82rem">'+esc(e.message)+'</p>';}
-  },
-
-  _fCell:function(k,uid,d){
-    if(d.fineAmount===0)return '<span class="bdg bdg-ok">none</span>';
-    var badge='<span class="bdg '+(d.finePaid?'bdg-paid':'bdg-fine')+'">₹'+d.fineAmount+' '+(d.finePaid?'paid':'owed')+'</span>';
-    var btn=!d.finePaid?'<button class="pay-btn" onclick="Dash.pay(\''+k+'\','+uid+')">Paid</button>':'';
-    return badge+btn;
-  },
-
-  pay:async function(k,uid){
-    try{await api('POST','/api/pact/history',{dateKey:k,userId:uid});toast('Marked as paid ✓','success');Dash.loadHistory();}
-    catch(e){toast(e.message,'error');}
   },
 
   renderSettings:function(){
@@ -331,20 +475,20 @@ var Dash={
     if(S.role==='creator'){
       sec.classList.remove('hidden');
       var ol=$('set-rules-ol');ol.innerHTML='';
-      pact.rules.forEach(function(r,i){var li=document.createElement('li');li.innerHTML='<input class="ri field" data-i="'+i+'" value="'+esc(r)+'" maxlength="120"/>';ol.appendChild(li);});
+      pact.rules.forEach(function(r,i){var li=document.createElement('li');li.innerHTML='<input class="ri" data-i="'+i+'" value="'+esc(r)+'" maxlength="120"/>';ol.appendChild(li);});
     }else{sec.classList.add('hidden');}
   },
 
   saveNick:async function(){
     var nick=$('set-nick').value.trim();if(!nick){toast('Enter a nickname.','error');return;}
-    try{await api('PATCH','/api/pact/nickname',{nickname:nick});var d=await api('GET','/api/pact');S.pact=d.pact;Dash.render();toast('Nickname saved ✓','success');}
+    try{await api('PATCH','/api/pact/nickname',{nickname:nick});var d=await api('GET','/api/pact');S.pact=d.pact;Dash._renderCount=0;Dash.render();toast('Nickname saved ✓','success');}
     catch(e){toast(e.message,'error');}
   },
 
   saveRules:async function(){
     var rules=Array.from(document.querySelectorAll('#set-rules-ol .ri')).map(function(i){return i.value.trim();}).filter(Boolean);
     if(!rules.length){toast('Need at least 1 rule.','error');return;}
-    try{await api('PUT','/api/pact/rules',{rules:rules});var d=await api('GET','/api/pact');S.pact=d.pact;Dash.render();toast(rules.length+' rules saved ✓','success');}
+    try{await api('PUT','/api/pact/rules',{rules:rules});var d=await api('GET','/api/pact');S.pact=d.pact;Dash._renderCount=0;Dash.render();toast(rules.length+' rules saved ✓','success');}
     catch(e){toast(e.message,'error');}
   },
 
@@ -358,11 +502,22 @@ var Dash={
     clearInterval(S._poll);
     S._poll=setInterval(async function(){
       if(!S.token||!S.pact||S._tab!=='today')return;
-      try{var d=await api('GET','/api/pact');if(d.pact){S.pact=d.pact;Dash.render();}}catch(_){}
+      try{
+        var d=await api('GET','/api/pact');
+        if(d.pact){
+          // Only update partner data — don't overwrite our own ticks
+          if(d.pact.partner) S.pact.partner=d.pact.partner;
+          S.pact.me.totalPoints=d.pact.me.totalPoints;
+          S.pact.me.streak=d.pact.me.streak;
+          S.pact.me.perfectDays=d.pact.me.perfectDays;
+          Dash.render();
+        }
+      }catch(_){}
     },POLL_MS);
   },
 };
 
+/* ══ BOOT ══ */
 window.addEventListener('error',function(e){
   console.error('App error:',e.message,e.lineno);
   var ls=$('v-loading');if(ls){ls.classList.add('hidden');ls.classList.remove('active');}
@@ -371,5 +526,9 @@ window.addEventListener('error',function(e){
 
 document.addEventListener('DOMContentLoaded',function(){
   try{App.init();}
-  catch(e){console.error('Init error:',e);var ls=$('v-loading');if(ls){ls.classList.add('hidden');ls.classList.remove('active');}goScreen('v-auth');}
+  catch(e){
+    console.error('Init error:',e);
+    var ls=$('v-loading');if(ls){ls.classList.add('hidden');ls.classList.remove('active');}
+    goScreen('v-auth');
+  }
 });
