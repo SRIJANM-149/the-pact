@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0e0c0a">
+<meta name="theme-color" content="#faf8f4" id="theme-meta">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>The Pact</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤝</text></svg>">
 <link rel="stylesheet" href="styles.css">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
 
 <!-- AUTH -->
 <div id="v-auth" class="screen hidden">
-  <div class="auth-outer">
+  <div class="auth-outer" style="display:flex;flex-direction:column;min-height:100dvh;justify-content:center">
     <div class="auth-card">
       <div class="auth-logo">🤝</div>
       <h1 class="auth-brand">The Pact</h1>
@@ -53,18 +53,16 @@
 
 <!-- FORGOT PASSWORD -->
 <div id="v-forgot" class="screen hidden">
-  <div class="page-wrap">
-    <header class="page-hdr">
-      <button class="back" onclick="Nav.go('auth')">← Back</button>
-      <h2 class="page-ttl">Reset Password</h2>
-      <span></span>
-    </header>
-    <div class="page-body" style="max-width:420px;margin:0 auto">
-      <p class="page-desc">Enter your email and we'll send you a password reset link.</p>
+  <div class="auth-outer" style="display:flex;flex-direction:column;min-height:100dvh;justify-content:center">
+    <div class="auth-card">
+      <div style="font-size:2rem;margin-bottom:0.75rem">🔑</div>
+      <h2 style="font-family:var(--serif);font-size:1.5rem;color:#f5f0e8;margin-bottom:0.5rem">Reset Password</h2>
+      <p style="font-size:0.84rem;color:#666;margin-bottom:1.5rem">Enter your email and we'll send a reset link.</p>
       <input class="field" type="email" id="fp-email" placeholder="Email address" onkeydown="if(event.key==='Enter')Auth.forgotPassword()"/>
       <p class="ferr hidden" id="fp-err"></p>
-      <p class="ferr hidden" id="fp-ok" style="color:var(--teal-dark)"></p>
+      <p class="hidden" id="fp-ok" style="color:#5DCAA5;font-size:0.83rem;margin-bottom:0.75rem"></p>
       <button class="btn-p" id="fp-btn" onclick="Auth.forgotPassword()">Send Reset Link →</button>
+      <button class="back" style="margin-top:1rem;width:100%;text-align:center;color:#555" onclick="Nav.go('auth')">← Back to Sign In</button>
     </div>
   </div>
 </div>
@@ -72,23 +70,26 @@
 <!-- HOME -->
 <div id="v-home" class="screen hidden">
   <div class="home-wrap">
-    <header class="home-hdr">
-      <span class="home-logo">🤝 The Pact</span>
-      <button class="ghost" onclick="Auth.logout()">Sign out</button>
+    <header class="top-bar">
+      <span class="top-logo">🤝 The Pact</span>
+      <div class="top-right">
+        <button class="dark-toggle" onclick="Theme.toggle()" id="home-toggle"><span class="toggle-icon">🌙</span><span class="toggle-txt">Dark</span></button>
+        <button class="ghost" onclick="Auth.logout()">Sign out</button>
+      </div>
     </header>
     <div class="home-body">
       <p class="home-hi">Hey, <span id="hi-name"></span> 👋</p>
       <p class="home-sub">Start a new pact or join one.</p>
       <div class="home-btns">
-        <button class="hab create-hab" onclick="Nav.go('create')">
+        <button class="hab" onclick="Nav.go('create')">
           <span class="hab-ico">✦</span>
           <span class="hab-ttl">Create a Pact</span>
-          <span class="hab-dsc">Set 25 rules, share an invite code</span>
+          <span class="hab-dsc">Set your rules, get an invite code to share</span>
         </button>
-        <button class="hab join-hab" onclick="Nav.go('join')">
+        <button class="hab" onclick="Nav.go('join')">
           <span class="hab-ico">⊕</span>
           <span class="hab-ttl">Join a Pact</span>
-          <span class="hab-dsc">Enter the code your partner shared</span>
+          <span class="hab-dsc">Enter the code your partner shared with you</span>
         </button>
       </div>
     </div>
@@ -101,7 +102,7 @@
     <header class="page-hdr">
       <button class="back" onclick="Nav.go('home')">← Back</button>
       <h2 class="page-ttl">Create a Pact</h2>
-      <span></span>
+      <button class="dark-toggle" onclick="Theme.toggle()" id="create-toggle"><span class="toggle-icon">🌙</span></button>
     </header>
     <div class="page-body">
       <p class="page-desc">Write your 25 daily rules. Set the fine per missed day.</p>
@@ -118,11 +119,11 @@
 
 <!-- INVITE CODE -->
 <div id="v-code" class="screen hidden">
-  <div class="code-outer">
+  <div class="code-outer" style="display:flex;flex-direction:column;min-height:100dvh;justify-content:center;padding:1.5rem">
     <div class="code-card">
       <div class="code-ico">🎉</div>
       <h2 class="code-ttl">Pact Created!</h2>
-      <p class="code-desc">Share this code with your partner. They enter it after signing up.</p>
+      <p class="code-desc">Share this code with your partner. They sign up and enter it to join.</p>
       <div class="code-box">
         <div class="code-val" id="invite-code">——</div>
         <button class="copy-btn" id="copy-btn" onclick="Nav.copyCode()">Copy</button>
@@ -139,11 +140,11 @@
     <header class="page-hdr">
       <button class="back" onclick="Nav.go('home')">← Back</button>
       <h2 class="page-ttl">Join a Pact</h2>
-      <span></span>
+      <button class="dark-toggle" onclick="Theme.toggle()" id="join-toggle"><span class="toggle-icon">🌙</span></button>
     </header>
     <div class="page-body" style="max-width:420px;margin:0 auto">
       <p class="page-desc">Enter the 6-character code your partner sent you.</p>
-      <input class="field code-field" id="j-code" placeholder="E.g. A3F9KX" maxlength="6"
+      <input class="field" id="j-code" placeholder="E.g. A3F9KX" maxlength="6"
         style="text-transform:uppercase;letter-spacing:5px;font-size:1.4rem;text-align:center"
         oninput="this.value=this.value.toUpperCase()"
         onkeydown="if(event.key==='Enter')JoinPact.submit()"/>
@@ -158,7 +159,7 @@
   <div class="page-wrap">
     <div class="page-body nick-body">
       <div class="nick-ico">✏️</div>
-      <h2 class="page-ttl" style="text-align:center;color:#f5f0e8;margin-bottom:0.5rem">One last thing</h2>
+      <h2 style="font-family:var(--serif);font-size:1.5rem;color:var(--ink);text-align:center;margin-bottom:0.5rem">One last thing</h2>
       <p class="page-desc" style="text-align:center">What nickname do you want to give your partner?</p>
       <input class="field" id="n-nick" placeholder="Their nickname…" maxlength="30" onkeydown="if(event.key==='Enter')Nickname.submit()"/>
       <p class="ferr hidden" id="n-err"></p>
@@ -169,16 +170,26 @@
 
 <!-- DASHBOARD -->
 <div id="v-dash" class="screen hidden">
-  <div id="dash-hdr"></div>
-  <main class="dash-main" id="dash-main">
+  <div class="dash-hdr-bar">
+    <div class="dh-left">
+      <div class="dh-name" id="dh-name"></div>
+      <div class="dh-meta" id="dh-meta"></div>
+    </div>
+    <div class="dh-right">
+      <span class="pact-age" id="dh-age"></span>
+      <button class="dark-toggle" onclick="Theme.toggle()" id="dash-toggle"><span class="toggle-icon">🌙</span><span class="toggle-txt">Dark</span></button>
+      <button class="ghost" onclick="Auth.logout()" style="padding:5px 12px;font-size:0.78rem">Sign out</button>
+    </div>
+  </div>
+  <main class="dash-main">
     <div id="dash-waiting" class="hidden"></div>
     <div id="dash-content">
       <div class="stats-row" id="dash-stats"></div>
       <div id="dash-info-bar"></div>
       <div id="dash-partner-bar"></div>
-      <div class="rules-sec">
+      <div>
         <div class="rules-hdr">
-          <span class="rules-lbl" id="rules-lbl">Today's Rules</span>
+          <span class="rules-lbl">Today's Rules</span>
           <span class="rules-ct" id="rules-ct"></span>
         </div>
         <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
@@ -186,9 +197,9 @@
       </div>
     </div>
   </main>
-  <nav class="bnav" id="bnav">
-    <button class="bnav-btn active" id="bn-today"   onclick="Dash.tab('today')"><span class="bn-ico">☑</span><span class="bn-lbl">Today</span></button>
-    <button class="bnav-btn"        id="bn-history" onclick="Dash.tab('history')"><span class="bn-ico">📋</span><span class="bn-lbl">History</span></button>
+  <nav class="bnav">
+    <button class="bnav-btn active" id="bn-today"    onclick="Dash.tab('today')"><span class="bn-ico">☑</span><span class="bn-lbl">Today</span></button>
+    <button class="bnav-btn"        id="bn-history"  onclick="Dash.tab('history')"><span class="bn-ico">📋</span><span class="bn-lbl">History</span></button>
     <button class="bnav-btn"        id="bn-settings" onclick="Dash.tab('settings')"><span class="bn-ico">⚙</span><span class="bn-lbl">Settings</span></button>
   </nav>
   <div id="pan-history" class="panel hidden">
@@ -206,13 +217,13 @@
         </div>
       </div>
       <div class="set-sec" id="rules-edit-sec">
-        <label class="set-lbl">Edit Rules <em style="font-style:normal;font-size:0.7rem;color:#aaa">(creator only)</em></label>
+        <label class="set-lbl">Edit Rules <em style="font-style:normal;font-size:0.7rem;color:var(--dim)">(creator only)</em></label>
         <ol class="rules-ol small" id="set-rules-ol"></ol>
         <button class="set-save" style="margin-top:0.75rem" onclick="Dash.saveRules()">Save Rules</button>
       </div>
       <div class="set-sec danger-sec">
         <label class="set-lbl" style="color:var(--red)">Leave Pact</label>
-        <p style="font-size:0.8rem;color:#888;margin-bottom:0.75rem">Dissolves the pact for both people.</p>
+        <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem">Dissolves the pact for both people.</p>
         <button class="danger-btn" onclick="Dash.leave()">Leave Pact</button>
       </div>
       <div class="set-sec" style="padding-bottom:2rem">
