@@ -599,7 +599,7 @@ var Dash={
       if(!S.token||!S.pact||S._tab!=='today')return;
       if(!S.pact.partner)return;
       try{
-        var d=await api('GET','/api/pact/today');
+        var d=await api('GET','/api/pact?today=1');
         if(!d.today)return;
         // Only update partner's ticks — never overwrite our own
         if(d.today.partner){
