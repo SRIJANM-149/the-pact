@@ -1,6 +1,8 @@
 'use strict';
-const BASE=window.location.origin,TK='pact_token',DK='pact_dark',POLL=12000;
-const S={token:null,user:null,pact:null,role:null,_poll:null,_tab:'today'};
+const BASE=window.location.origin,TK='pact_token',DK='pact_dark';
+const POLL_FAST=4000;   // partner tick sync — lightweight
+const POLL_FULL=30000;  // full pact refresh — heavier
+const S={token:null,user:null,pact:null,role:null,_pollFast:null,_pollFull:null,_tab:'today'};
 
 var $=function(id){return document.getElementById(id);};
 function tx(id,v){$(id).textContent=v;}
@@ -22,7 +24,7 @@ async function api(method,path,body){
 
 /* ── BACKGROUND ── */
 var BG={
-  c:null,x:null,pts:[],raf:null,
+  c:null,x:null,pts:[],
   init:function(){
     this.c=$('bg-canvas');if(!this.c)return;
     this.x=this.c.getContext('2d');
@@ -31,10 +33,7 @@ var BG={
     this.draw();
   },
   resize:function(){if(!this.c)return;this.c.width=window.innerWidth;this.c.height=window.innerHeight;},
-  mk:function(){
-    var dark=document.body.classList.contains('dark');
-    return{x:Math.random()*window.innerWidth,y:Math.random()*window.innerHeight,r:Math.random()*2.5+.8,dx:(Math.random()-.5)*.3,dy:(Math.random()-.5)*.3,o:Math.random()*.4+.05,h:dark?Math.random()*40+220:Math.random()*40+210};
-  },
+  mk:function(){var dark=document.body.classList.contains('dark');return{x:Math.random()*window.innerWidth,y:Math.random()*window.innerHeight,r:Math.random()*2.5+.8,dx:(Math.random()-.5)*.3,dy:(Math.random()-.5)*.3,o:Math.random()*.35+.05,h:dark?Math.random()*40+220:Math.random()*40+210};},
   draw:function(){
     if(!this.x)return;
     var w=this.c.width,h=this.c.height,dark=document.body.classList.contains('dark');
@@ -44,10 +43,10 @@ var BG={
       if(p.x<-8)p.x=w+8;if(p.x>w+8)p.x=-8;
       if(p.y<-8)p.y=h+8;if(p.y>h+8)p.y=-8;
       BG.x.beginPath();BG.x.arc(p.x,p.y,p.r,0,Math.PI*2);
-      BG.x.fillStyle='hsla('+p.h+',40%,'+(dark?'70%':'50%')+','+p.o+')';
+      BG.x.fillStyle='hsla('+p.h+',35%,'+(dark?'65%':'45%')+','+p.o+')';
       BG.x.fill();
     });
-    BG.raf=requestAnimationFrame(function(){BG.draw();});
+    requestAnimationFrame(function(){BG.draw();});
   }
 };
 
@@ -96,8 +95,11 @@ var Auth={
   },
   _save:function(d){S.token=d.token;S.user=d.user;localStorage.setItem(TK,d.token);},
   logout:function(){
-    S.token=null;S.user=null;S.pact=null;localStorage.removeItem(TK);clearInterval(S._poll);
-    goScreen('v-auth');Auth.tab('login');$('l-email').value='';$('l-pass').value='';toast('Signed out.');
+    S.token=null;S.user=null;S.pact=null;
+    localStorage.removeItem(TK);
+    clearInterval(S._pollFast);clearInterval(S._pollFull);
+    goScreen('v-auth');Auth.tab('login');$('l-email').value='';$('l-pass').value='';
+    toast('Signed out.');
   }
 };
 
@@ -118,7 +120,7 @@ var App={
     try{var d=await api('GET','/api/pact');S.pact=d.pact;}catch(_){S.pact=null;}
     App._fade();
     if(!S.pact){tx('hi-name',S.user.displayName);goScreen('v-home');}
-    else{S.role=S.pact.me.role;Dash.render();Dash.poll();goScreen('v-dash');}
+    else{S.role=S.pact.me.role;Dash.render();Dash.startPolling();goScreen('v-dash');}
   }
 };
 
@@ -130,7 +132,7 @@ var Nav={
     if(s==='create'){CP.open();return;}
     if(s==='forgot'){$('fp-email').value='';serr('fp-err','');var ok=$('fp-ok');ok.textContent='';ok.classList.add('hidden');goScreen('v-forgot');return;}
     if(s==='join'){$('j-code').value='';serr('j-err','');goScreen('v-join');return;}
-    if(s==='dashboard'){Dash.render();Dash.poll();goScreen('v-dash');return;}
+    if(s==='dashboard'){Dash.render();Dash.startPolling();goScreen('v-dash');return;}
   },
   copyCode:function(){
     var code=$('invite-code').textContent,btn=$('copy-btn');
@@ -178,26 +180,213 @@ var JP={
 var Nick={
   submit:async function(){
     var nick=$('n-nick').value.trim();if(!nick){serr('n-err','Enter a nickname.');return;}
-    try{await api('PATCH','/api/pact/nickname',{nickname:nick});var d=await api('GET','/api/pact');S.pact=d.pact;S.role=S.pact.me.role;Dash.render();Dash.poll();goScreen('v-dash');}
-    catch(e){serr('n-err',e.message);}
+    try{
+      await api('PATCH','/api/pact/nickname',{nickname:nick});
+      var d=await api('GET','/api/pact');S.pact=d.pact;S.role=S.pact.me.role;
+      Dash.render();Dash.startPolling();goScreen('v-dash');
+    }catch(e){serr('n-err',e.message);}
   }
 };
 
 function daysAgo(ds){if(!ds)return 0;return Math.floor((Date.now()-new Date(String(ds).slice(0,10)+'T00:00:00Z'))/86400000);}
 
+/* ── CHARTS ── */
+var Charts={
+  _chart1:null,_chart2:null,
+
+  draw:function(pact){
+    if(!pact||!pact.me.history)return;
+    var container=$('charts-row');
+    if(!container)return;
+
+    var dark=document.body.classList.contains('dark');
+    var ink=dark?'rgba(240,239,233,.7)':'rgba(17,17,16,.6)';
+    var bdr=dark?'rgba(42,42,40,1)':'rgba(232,232,228,1)';
+    var myColor=dark?'rgba(240,239,233,1)':'rgba(17,17,16,1)';
+    var ptColor=dark?'rgba(96,94,87,1)':'rgba(138,138,133,1)';
+
+    var myHist=pact.me.history||[];
+    var ptHist=(pact.partner&&pact.partner.history)||[];
+    var ppr=pact.pointsPerRule||10;
+    var totalRules=pact.rules.length;
+    var maxDayPts=totalRules*ppr;
+    var myTodayPts=pact.me.today.length*ppr;
+    var ptTodayPts=(pact.partner&&pact.partner.today.length*ppr)||0;
+    var myRemainingPts=maxDayPts-myTodayPts;
+
+    container.innerHTML=
+      '<div class="chart-card">'+
+        '<div class="chart-title">Today\'s completion</div>'+
+        '<canvas id="chart-pie" width="160" height="160" style="display:block;margin:0 auto"></canvas>'+
+        '<div class="chart-legend" id="chart-legend"></div>'+
+      '</div>'+
+      '<div class="chart-card">'+
+        '<div class="chart-title">Points over time</div>'+
+        '<canvas id="chart-line" style="width:100%;height:160px"></canvas>'+
+      '</div>';
+
+    // PIE CHART
+    Charts._drawPie($('chart-pie'), myTodayPts, myRemainingPts, ptTodayPts, maxDayPts, dark, pact);
+
+    // LEGEND
+    var myName=pact.me.nicknameFromPartner||pact.me.name||'You';
+    var ptName=(pact.partner&&(pact.partner.nickname||pact.partner.name))||'Partner';
+    hm('chart-legend',
+      '<div class="cl-item"><span class="cl-dot" style="background:'+myColor+'"></span>'+esc(myName)+': '+myTodayPts+'pts</div>'+
+      (pact.partner?'<div class="cl-item"><span class="cl-dot" style="background:'+ptColor+'"></span>'+esc(ptName)+': '+ptTodayPts+'pts</div>':'')
+    );
+
+    // LINE CHART
+    Charts._drawLine($('chart-line'), myHist, ptHist, dark, myColor, ptColor, pact);
+  },
+
+  _drawPie:function(canvas, myPts, myRemaining, ptPts, maxPts, dark, pact){
+    if(!canvas)return;
+    var ctx=canvas.getContext('2d');
+    var W=160,H=160,cx=W/2,cy=H/2,R=62,inner=38;
+    ctx.clearRect(0,0,W,H);
+
+    var dark=document.body.classList.contains('dark');
+    var bgColor=dark?'#1e1e1c':'#f4f4f2';
+    var myColor=dark?'rgba(240,239,233,1)':'rgba(17,17,16,.9)';
+    var ptColor=dark?'rgba(96,94,87,.8)':'rgba(138,138,133,.7)';
+    var emptyColor=dark?'rgba(42,42,40,1)':'rgba(232,232,228,1)';
+
+    var total=pact.rules.length*(pact.pointsPerRule||10)*2||1;
+    var slices=[
+      {val:myPts, color:myColor},
+      {val:ptPts, color:ptColor},
+      {val:Math.max(0,total-myPts-ptPts), color:emptyColor}
+    ];
+
+    var start=-Math.PI/2;
+    slices.forEach(function(sl){
+      if(sl.val<=0)return;
+      var angle=(sl.val/total)*Math.PI*2;
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy,R,start,start+angle);
+      ctx.closePath();
+      ctx.fillStyle=sl.color;
+      ctx.fill();
+      start+=angle;
+    });
+
+    // Donut hole
+    ctx.beginPath();ctx.arc(cx,cy,inner,0,Math.PI*2);
+    ctx.fillStyle=bgColor;ctx.fill();
+
+    // Center text
+    var pct=total>0?Math.round((myPts+ptPts)/total*100):0;
+    ctx.fillStyle=dark?'rgba(240,239,233,.9)':'rgba(17,17,16,.85)';
+    ctx.font='600 18px Inter,system-ui,sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(pct+'%',cx,cy-6);
+    ctx.font='400 9px Inter,system-ui,sans-serif';
+    ctx.fillStyle=dark?'rgba(96,94,87,1)':'rgba(138,138,133,1)';
+    ctx.fillText('combined',cx,cy+10);
+  },
+
+  _drawLine:function(canvas, myHist, ptHist, dark, myColor, ptColor, pact){
+    if(!canvas)return;
+    canvas.width=canvas.offsetWidth||300;
+    canvas.height=160;
+    var ctx=canvas.getContext('2d');
+    var W=canvas.width,H=canvas.height;
+    ctx.clearRect(0,0,W,H);
+
+    if(!myHist.length&&!ptHist.length){
+      ctx.fillStyle=dark?'rgba(96,94,87,1)':'rgba(138,138,133,1)';
+      ctx.font='12px Inter,system-ui,sans-serif';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('No history yet',W/2,H/2);
+      return;
+    }
+
+    // Build cumulative data
+    var allDates=[];
+    var dateSet={};
+    myHist.forEach(function(r){dateSet[r.date]=1;});
+    ptHist.forEach(function(r){dateSet[r.date]=1;});
+    allDates=Object.keys(dateSet).sort();
+    if(!allDates.length)return;
+
+    // Build cumulative running totals
+    var myCum=0,ptCum=0,myData=[],ptData=[];
+    allDates.forEach(function(d){
+      var mr=myHist.find(function(r){return r.date===d;});
+      var pr=ptHist.find(function(r){return r.date===d;});
+      myCum+=(mr?mr.pts:0);ptCum+=(pr?pr.pts:0);
+      myData.push(myCum);ptData.push(ptCum);
+    });
+
+    var maxVal=Math.max.apply(null,myData.concat(ptData))||1;
+    var pad={l:12,r:12,t:12,b:24};
+    var gW=W-pad.l-pad.r,gH=H-pad.t-pad.b;
+    var n=allDates.length;
+    var xStep=n>1?gW/(n-1):gW;
+
+    function px(i){return pad.l+(n>1?(i/(n-1))*gW:gW/2);}
+    function py(v){return pad.t+gH*(1-(v/maxVal));}
+
+    // Grid lines
+    ctx.strokeStyle=dark?'rgba(42,42,40,.8)':'rgba(232,232,228,.8)';
+    ctx.lineWidth=1;
+    [0,.5,1].forEach(function(f){
+      var y=pad.t+gH*f;
+      ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    });
+
+    // Draw lines
+    function drawLine(data,color,dashed){
+      if(data.length<1)return;
+      ctx.strokeStyle=color;ctx.lineWidth=1.5;
+      if(dashed){ctx.setLineDash([4,4]);}else{ctx.setLineDash([]);}
+      ctx.beginPath();
+      data.forEach(function(v,i){i===0?ctx.moveTo(px(i),py(v)):ctx.lineTo(px(i),py(v));});
+      ctx.stroke();ctx.setLineDash([]);
+      // Dots
+      data.forEach(function(v,i){
+        ctx.beginPath();ctx.arc(px(i),py(v),2.5,0,Math.PI*2);
+        ctx.fillStyle=color;ctx.fill();
+      });
+    }
+
+    drawLine(myData, myColor, false);
+    if(ptHist.length) drawLine(ptData, ptColor, true);
+
+    // X axis labels (show first, middle, last)
+    ctx.fillStyle=dark?'rgba(96,94,87,1)':'rgba(138,138,133,1)';
+    ctx.font='9px Inter,system-ui,sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='top';
+    var labelIdxs=[0];
+    if(n>2)labelIdxs.push(Math.floor(n/2));
+    if(n>1)labelIdxs.push(n-1);
+    labelIdxs.forEach(function(i){
+      var d=allDates[i];
+      var label=new Date(d+'T12:00:00Z').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+      ctx.fillText(label,px(i),H-pad.b+6);
+    });
+  }
+};
+
 /* ── DASHBOARD ── */
 var Dash={
-  _hist:{},_rc:0,
+  _rc:0,
 
   render:function(){
     if(!S.pact)return;
     var p=S.pact;
     $('v-dash').className='screen active';
 
-    // Nav
-    tx('dn-name',p.me.name||S.user.displayName);
-    var ptLbl=p.partner?('vs '+(p.partner.nickname||p.partner.name)):'Waiting for partner';
-    tx('dn-meta',new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})+' · '+ptLbl);
+    // Header — show MY real name (display_name), not nickname
+    // nicknameFromPartner = what partner calls me (optional cosmetic)
+    var myDisplayName = p.me.name || S.user.displayName;
+    tx('dn-name', myDisplayName);
+    var ptLabel = p.partner
+      ? ('vs ' + (p.partner.nickname || p.partner.name))
+      : 'Waiting for partner';
+    tx('dn-meta', new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})+' · '+ptLabel);
     tx('dn-day','Day '+(daysAgo(p.createdAt)+1));
 
     // Waiting
@@ -225,40 +414,37 @@ var Dash={
     var ptPct=total>0?Math.round(ptChk/total*100):0;
     var myLead=myTP>ptTP,tied=myTP===ptTP;
 
-    // Score
+    // Score — show MY real display name on my side
     hm('score-strip',
       '<div class="score-side">'+
-        '<div class="score-label">'+esc(me.name||'You')+'</div>'+
+        '<div class="score-label">'+esc(myDisplayName)+'</div>'+
         '<div class="score-num'+(myLead&&!tied?' leading':'')+'" id="my-score">'+myTP+'</div>'+
         '<div class="score-today">+'+myChk*ppr+' today</div>'+
       '</div>'+
       '<div class="score-mid"><div class="score-vs-label">VS</div><div class="score-divline"></div></div>'+
       '<div class="score-side" style="text-align:right">'+
+        // Partner shown by the nickname I gave them (or their real name)
         '<div class="score-label">'+esc(pt.nickname||pt.name)+'</div>'+
         '<div class="score-num'+((!myLead&&!tied)?' leading':'')+'" id="pt-score">'+ptTP+'</div>'+
         '<div class="score-today">+'+ptChk*ppr+' today</div>'+
       '</div>'
     );
 
-    // Stats
     hm('stats-row',
       '<div class="stat-tile"><div class="st-label">Streak</div><div class="st-val amber">'+me.streak+'d</div></div>'+
       '<div class="stat-tile"><div class="st-label">Perfect days</div><div class="st-val green">'+me.perfectDays+'</div></div>'+
       '<div class="stat-tile"><div class="st-label">Pts / rule</div><div class="st-val">'+ppr+'</div></div>'
     );
 
-    // Partner
     hm('partner-row',
       '<span class="pr-name">'+esc(pt.nickname||pt.name)+'</span>'+
       '<div class="pr-track"><div class="pr-fill'+(ptPct===100?' done':'')+'" style="width:'+ptPct+'%"></div></div>'+
       '<span class="pr-ct">'+ptChk+'/'+total+'</span>'
     );
 
-    // Progress
     $('prog-fill').style.width=pct+'%';
     tx('rules-tally',myChk+' / '+total);
 
-    // Rules grid
     Dash._rules(p,me,ppr);
   },
 
@@ -287,7 +473,7 @@ var Dash={
   },
 
   tick:function(idx,checked,el,ppr){
-    // Instant optimistic update
+    // Instant UI
     el.classList.toggle('done',checked);
     if(checked){
       el.classList.add('ticked');
@@ -296,28 +482,26 @@ var Dash={
       f.className='pts-float';f.textContent='+'+ppr+'pts';
       el.appendChild(f);setTimeout(function(){if(f.parentNode)f.parentNode.removeChild(f);},700);
     }
-
     // Update local state
     if(checked&&!S.pact.me.today.includes(idx))S.pact.me.today.push(idx);
     else if(!checked)S.pact.me.today=S.pact.me.today.filter(function(i){return i!==idx;});
 
-    // Update progress
+    // Update progress immediately
     var total=S.pact.rules.length,chk=S.pact.me.today.length,pct=total>0?Math.round(chk/total*100):0;
     $('prog-fill').style.width=pct+'%';
     tx('rules-tally',chk+' / '+total);
-
-    // Update score display
     var ppr2=S.pact.pointsPerRule||10;
     var myTP=S.pact.me.totalPoints+(chk*ppr2);
-    var myScoreEl=$('my-score');if(myScoreEl)myScoreEl.textContent=myTP;
+    var myEl=$('my-score');if(myEl)myEl.textContent=myTP;
 
-    // Background API call
+    // Background API
     api('POST','/api/pact/tick',{ruleIndex:idx,checked:checked}).catch(function(){
       el.classList.toggle('done',!checked);
       if(checked)S.pact.me.today=S.pact.me.today.filter(function(i){return i!==idx;});
       else if(!S.pact.me.today.includes(idx))S.pact.me.today.push(idx);
-      var chk2=S.pact.me.today.length,pct2=S.pact.rules.length>0?Math.round(chk2/S.pact.rules.length*100):0;
-      $('prog-fill').style.width=pct2+'%';tx('rules-tally',chk2+' / '+S.pact.rules.length);
+      var chk2=S.pact.me.today.length;
+      $('prog-fill').style.width=(S.pact.rules.length>0?Math.round(chk2/S.pact.rules.length*100):0)+'%';
+      tx('rules-tally',chk2+' / '+S.pact.rules.length);
       toast('Could not save — check connection','error');
     });
   },
@@ -339,8 +523,10 @@ var Dash={
 
   loadHist:async function(){
     var hb=$('hist-body');hb.innerHTML='<p style="color:var(--ink3);font-size:.82rem;padding:.4rem 0">Loading…</p>';
+    // Draw charts from existing pact data first (fast)
+    if(S.pact) Charts.draw(S.pact);
     try{
-      var d=await api('GET','/api/pact/history');Dash._hist=d.history;
+      var d=await api('GET','/api/pact/history');
       var h=d.history,keys=Object.keys(h).sort().reverse();
       var me=S.pact.me,pt=S.pact.partner,myId=me.userId,ptId=pt&&pt.userId;
       if(!keys.length){hb.innerHTML='<p style="color:var(--ink3);font-size:.82rem;padding:.4rem 0">No history yet — check back after midnight.</p>';return;}
@@ -355,10 +541,12 @@ var Dash={
           if(r.checked>=Math.ceil(r.total*.6))return '<span class="hbadge hb-ok">'+r.checked+'/'+r.total+'</span>';
           return '<span class="hbadge hb-miss">'+r.checked+'/'+r.total+'</span>';
         }
+        var myName=me.nicknameFromPartner||me.name||'You';
+        var ptName=(pt&&(pt.nickname||pt.name))||'Partner';
         html+='<div class="hist-entry">'+
           '<div class="hist-date">'+fmtD(k)+'</div>'+
-          '<div class="hist-prow"><div class="hp-left">'+esc(me.name||'You')+' '+badge(m)+'</div><div class="hp-pts">+'+m.points+'</div></div>'+
-          (p2?'<div class="hist-prow"><div class="hp-left">'+esc((pt&&(pt.nickname||pt.name))||'Partner')+' '+badge(p2)+'</div><div class="hp-pts" style="color:var(--ink3)">+'+p2.points+'</div></div>':'')+
+          '<div class="hist-prow"><div class="hp-left">'+esc(myName)+' '+badge(m)+'</div><div class="hp-pts">+'+m.points+'</div></div>'+
+          (p2?'<div class="hist-prow"><div class="hp-left">'+esc(ptName)+' '+badge(p2)+'</div><div class="hp-pts" style="color:var(--ink3)">+'+p2.points+'</div></div>':'')+
           '</div>';
       });
       hb.innerHTML=html;
@@ -366,7 +554,9 @@ var Dash={
   },
 
   renderSet:function(){
-    var p=S.pact;$('set-nick').value=(p.partner&&p.partner.nickname)||'';
+    var p=S.pact;
+    // Pre-fill with current nickname I gave to partner
+    $('set-nick').value=(p.partner&&p.partner.nickname)||'';
     var sec=$('rules-edit-sec');
     if(S.role==='creator'){
       sec.classList.remove('hidden');
@@ -377,8 +567,11 @@ var Dash={
 
   saveNick:async function(){
     var nick=$('set-nick').value.trim();if(!nick){toast('Enter a nickname.','error');return;}
-    try{await api('PATCH','/api/pact/nickname',{nickname:nick});var d=await api('GET','/api/pact');S.pact=d.pact;Dash._rc=0;Dash.render();toast('Saved','success');}
-    catch(e){toast(e.message,'error');}
+    try{
+      await api('PATCH','/api/pact/nickname',{nickname:nick});
+      var d=await api('GET','/api/pact');S.pact=d.pact;Dash._rc=0;Dash.render();
+      toast('Nickname saved — partner now shows as "'+nick+'"','success');
+    }catch(e){toast(e.message,'error');}
   },
 
   saveRules:async function(){
@@ -390,25 +583,70 @@ var Dash={
 
   leave:async function(){
     if(!confirm('Leave pact?\n\nThis dissolves the pact for both people permanently.'))return;
-    try{await api('DELETE','/api/pact');S.pact=null;clearInterval(S._poll);tx('hi-name',S.user.displayName);goScreen('v-home');toast('Left the pact.');}
-    catch(e){toast(e.message,'error');}
+    try{
+      await api('DELETE','/api/pact');S.pact=null;
+      clearInterval(S._pollFast);clearInterval(S._pollFull);
+      tx('hi-name',S.user.displayName);goScreen('v-home');
+      toast('Left the pact.');
+    }catch(e){toast(e.message,'error');}
   },
 
-  poll:function(){
-    clearInterval(S._poll);
-    S._poll=setInterval(async function(){
+  startPolling:function(){
+    clearInterval(S._pollFast);clearInterval(S._pollFull);
+
+    // Fast poll — only today's ticks (lightweight, every 4 seconds)
+    S._pollFast=setInterval(async function(){
       if(!S.token||!S.pact||S._tab!=='today')return;
+      if(!S.pact.partner)return;
+      try{
+        var d=await api('GET','/api/pact/today');
+        if(!d.today)return;
+        // Only update partner's ticks — never overwrite our own
+        if(d.today.partner){
+          var prev=S.pact.partner.today||[];
+          var next=d.today.partner;
+          // Only re-render if partner data actually changed
+          var changed=JSON.stringify(prev.slice().sort())!==JSON.stringify(next.slice().sort());
+          if(changed){
+            S.pact.partner.today=next;
+            Dash._updatePartnerUI();
+          }
+        }
+      }catch(_){}
+    },POLL_FAST);
+
+    // Full poll — refresh everything every 30 seconds
+    S._pollFull=setInterval(async function(){
+      if(!S.token||!S.pact)return;
       try{
         var d=await api('GET','/api/pact');
         if(d.pact){
-          if(d.pact.partner)S.pact.partner=d.pact.partner;
-          S.pact.me.totalPoints=d.pact.me.totalPoints;
-          S.pact.me.streak=d.pact.me.streak;
-          S.pact.me.perfectDays=d.pact.me.perfectDays;
-          Dash.render();
+          // Merge carefully — preserve our local today ticks
+          var myToday=S.pact.me.today;
+          S.pact=d.pact;
+          S.pact.me.today=myToday;
+          if(S._tab==='today')Dash.render();
         }
       }catch(_){}
-    },POLL);
+    },POLL_FULL);
+  },
+
+  // Lightweight partner-only UI update (no full re-render)
+  _updatePartnerUI:function(){
+    if(!S.pact||!S.pact.partner)return;
+    var pt=S.pact.partner,total=S.pact.rules.length,ppr=S.pact.pointsPerRule||10;
+    var ptChk=pt.today.length;
+    var ptPct=total>0?Math.round(ptChk/total*100):0;
+    // Update partner bar
+    var fill=document.querySelector('.pr-fill');
+    if(fill){fill.style.width=ptPct+'%';fill.classList.toggle('done',ptPct===100);}
+    var ct=document.querySelector('.pr-ct');if(ct)ct.textContent=ptChk+'/'+total;
+    // Update partner score
+    var ptTP=pt.totalPoints+(ptChk*ppr);
+    var ptEl=$('pt-score');if(ptEl)ptEl.textContent=ptTP;
+    // Update score-today
+    var todayEls=document.querySelectorAll('.score-today');
+    if(todayEls[1])todayEls[1].textContent='+'+ptChk*ppr+' today';
   }
 };
 
