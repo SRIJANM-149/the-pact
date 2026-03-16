@@ -1,7 +1,15 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)",     "destination": "/index.html" }
+    { "source": "/api/auth/:path*", "destination": "/api/auth/:path*" },
+    { "source": "/api/pact/create",  "destination": "/api/pact/create" },
+    { "source": "/api/pact/join",    "destination": "/api/pact/join" },
+    { "source": "/api/pact/tick",    "destination": "/api/pact/tick" },
+    { "source": "/api/pact/rules",   "destination": "/api/pact/rules" },
+    { "source": "/api/pact/archive", "destination": "/api/pact/archive" },
+    { "source": "/api/pact/history", "destination": "/api/pact/history" },
+    { "source": "/api/pact/:path*",  "destination": "/api/pact/index" },
+    { "source": "/api/pact",         "destination": "/api/pact/index" },
+    { "source": "/(.*)",             "destination": "/index.html" }
   ],
   "crons": [
     { "path": "/api/pact/archive", "schedule": "5 0 * * *" }
