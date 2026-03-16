@@ -2,9 +2,10 @@
 
 const BASE    = window.location.origin;
 const TK      = 'pact_token';
+const DK      = 'pact_dark';
 const POLL_MS = 14000;
 
-const S = { token:null,user:null,pact:null,role:null,theme:'light',_poll:null,_tab:'today' };
+const S = { token:null,user:null,pact:null,role:null,_poll:null,_tab:'today' };
 
 var $ = function(id){ return document.getElementById(id); };
 function tx(id,v){ $(id).textContent=v; }
@@ -18,10 +19,10 @@ function toast(msg,type,ms){
   var el=$('toast');el.textContent=msg;el.className='toast show'+(type?' '+type:'');
   clearTimeout(_tt);_tt=setTimeout(function(){el.className='toast';},ms);
 }
-function showErr(id,msg){ var el=$(id);el.textContent=msg||'';el.classList.toggle('hidden',!msg); }
+function showErr(id,msg){var el=$(id);el.textContent=msg||'';el.classList.toggle('hidden',!msg);}
 
 function goScreen(id){
-  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active');s.classList.add('hidden'); });
+  document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');s.classList.add('hidden');});
   var el=$(id);el.classList.remove('hidden');el.classList.add('active');
 }
 
@@ -34,6 +35,35 @@ async function api(method,path,body){
   return data;
 }
 
+/* ── THEME ── */
+var Theme = {
+  init:function(){
+    if(localStorage.getItem(DK)==='1') document.body.classList.add('dark');
+    Theme._updateToggles();
+  },
+  toggle:function(){
+    document.body.classList.toggle('dark');
+    localStorage.setItem(DK, document.body.classList.contains('dark')?'1':'0');
+    Theme._updateToggles();
+  },
+  isDark:function(){ return document.body.classList.contains('dark'); },
+  _updateToggles:function(){
+    var dark=Theme.isDark();
+    var icon=dark?'☀️':'🌙';
+    var txt=dark?'Light':'Dark';
+    document.querySelectorAll('.dark-toggle').forEach(function(btn){
+      var iconEl=btn.querySelector('.toggle-icon');
+      var txtEl=btn.querySelector('.toggle-txt');
+      if(iconEl) iconEl.textContent=icon;
+      if(txtEl) txtEl.textContent=txt;
+    });
+    // update theme-color meta
+    var meta=$('theme-meta');
+    if(meta) meta.setAttribute('content', dark?'#0d1b2a':'#faf8f4');
+  },
+};
+
+/* ── AUTH ── */
 var Auth={
   switchTab:function(t){
     $('tab-in').classList.toggle('active',t==='login');
@@ -75,8 +105,10 @@ var Auth={
   },
 };
 
+/* ── APP BOOT ── */
 var App={
   init:async function(){
+    Theme.init();
     var saved=localStorage.getItem(TK);
     if(saved){
       S.token=saved;
@@ -93,11 +125,11 @@ var App={
     try{var d=await api('GET','/api/pact');S.pact=d.pact;}catch(_){S.pact=null;}
     App._fadeLoad();
     if(!S.pact){tx('hi-name',S.user.displayName);goScreen('v-home');}
-    else{App._applyRole();Dash.render();Dash.startPoll();goScreen('v-dash');}
+    else{S.role=S.pact.me.role;Dash.render();Dash.startPoll();goScreen('v-dash');}
   },
-  _applyRole:function(){if(!S.pact)return;S.role=S.pact.me.role;S.theme=S.role==='creator'?'light':'dark';},
 };
 
+/* ── NAV ── */
 var Nav={
   go:function(screen){
     if(screen==='home'){tx('hi-name',S.user&&S.user.displayName||'');goScreen('v-home');return;}
@@ -115,6 +147,7 @@ var Nav={
   },
 };
 
+/* ── CREATE PACT ── */
 var CreatePact={
   open:function(){
     var ol=$('c-rules-ol');ol.innerHTML='';
@@ -128,68 +161,60 @@ var CreatePact={
     var btn=$('c-btn');btn.disabled=true;btn.textContent='Creating…';
     try{
       var d=await api('POST','/api/pact/create',{rules:rules,fineAmount:fine});
-      $('invite-code').textContent=d.inviteCode;S.role='creator';S.theme='light';
+      $('invite-code').textContent=d.inviteCode;S.role='creator';
       api('GET','/api/pact').then(function(r){if(r.pact)S.pact=r.pact;}).catch(function(){});
       goScreen('v-code');
     }catch(e){showErr('c-err',e.message);btn.disabled=false;btn.textContent='Create & Get Invite Code →';}
   },
 };
 
+/* ── JOIN PACT ── */
 var JoinPact={
   submit:async function(){
     var code=$('j-code').value.trim().toUpperCase();
     if(code.length<4){showErr('j-err','Enter a valid invite code.');return;}
     var btn=$('j-btn');btn.disabled=true;btn.textContent='Joining…';
-    try{await api('POST','/api/pact/join',{inviteCode:code});S.role='joiner';S.theme='dark';$('n-nick').value='';showErr('n-err','');goScreen('v-nick');}
+    try{await api('POST','/api/pact/join',{inviteCode:code});S.role='joiner';$('n-nick').value='';showErr('n-err','');goScreen('v-nick');}
     catch(e){showErr('j-err',e.message);btn.disabled=false;btn.textContent='Join Pact →';}
   },
 };
 
+/* ── NICKNAME ── */
 var Nickname={
   submit:async function(){
     var nick=$('n-nick').value.trim();
     if(!nick){showErr('n-err','Enter a nickname for your partner.');return;}
-    try{await api('PATCH','/api/pact/nickname',{nickname:nick});var d=await api('GET','/api/pact');S.pact=d.pact;App._applyRole();Dash.render();Dash.startPoll();goScreen('v-dash');}
+    try{await api('PATCH','/api/pact/nickname',{nickname:nick});var d=await api('GET','/api/pact');S.pact=d.pact;S.role=S.pact.me.role;Dash.render();Dash.startPoll();goScreen('v-dash');}
     catch(e){showErr('n-err',e.message);}
   },
 };
 
 function daysBetween(dateStr){
   if(!dateStr)return 0;
-  var start=new Date(String(dateStr).slice(0,10)+'T00:00:00Z');
-  return Math.floor((Date.now()-start)/(86400000));
+  return Math.floor((Date.now()-new Date(String(dateStr).slice(0,10)+'T00:00:00Z'))/(86400000));
 }
 function calcStreak(history,userId){
   var keys=Object.keys(history).sort().reverse(),streak=0;
-  for(var i=0;i<keys.length;i++){
-    var day=history[keys[i]];
-    if(day[userId]&&day[userId].fineAmount===0)streak++;else break;
-  }
+  for(var i=0;i<keys.length;i++){var day=history[keys[i]];if(day[userId]&&day[userId].fineAmount===0)streak++;else break;}
   return streak;
 }
 
+/* ── DASHBOARD ── */
 var Dash={
   _history:{},
 
   render:function(){
     if(!S.pact)return;
-    var pact=S.pact,dark=S.theme==='dark';
-    $('v-dash').className='screen active t-'+S.theme;
+    var pact=S.pact;
+    $('v-dash').className='screen active';
 
-    var myName=esc(pact.me.name||S.user.displayName);
-    var ptLabel=pact.partner?esc(pact.partner.nickname||pact.partner.name):'Waiting for partner…';
-    var pactDays=daysBetween(pact.createdAt);
-    var ageStr='Day '+(pactDays+1);
+    // Header
+    tx('dh-name', pact.me.name||S.user.displayName);
+    var ptLabel=pact.partner?('vs '+(pact.partner.nickname||pact.partner.name)):'Waiting for partner…';
+    tx('dh-meta', new Date().toDateString().toUpperCase()+' · '+ptLabel);
+    tx('dh-age', 'Day '+(daysBetween(pact.createdAt)+1));
 
-    hm('dash-hdr',dark?
-      '<div class="hdr-dark"><div><div class="hn">'+myName+'<span class="hb">// dark</span></div><div class="hm">'+new Date().toDateString().toUpperCase()+' · vs '+ptLabel+'</div></div><div style="display:flex;align-items:center;gap:10px"><span class="pact-age">'+ageStr+'</span><button class="hdr-signout" onclick="Auth.logout()">Sign out</button></div></div>':
-      '<div class="hdr-light"><div><div class="hn">'+myName+'<span class="hb">light</span></div><div class="hm">'+new Date().toDateString().toUpperCase()+' · vs '+ptLabel+'</div></div><div style="display:flex;align-items:center;gap:10px"><span class="pact-age">'+ageStr+'</span><button class="hdr-signout" onclick="Auth.logout()">Sign out</button></div></div>'
-    );
-
-    var bnav=$('bnav');
-    bnav.style.background=dark?'var(--navy)':'var(--ink)';
-    bnav.style.borderTopColor=dark?'var(--navy-bdr)':'#2e2820';
-
+    // Waiting state
     var waiting=$('dash-waiting'),content=$('dash-content');
     if(!pact.partner){
       waiting.classList.remove('hidden');content.classList.add('hidden');
@@ -231,7 +256,6 @@ var Dash={
         '<span class="pb-ct">'+ptChk+'/'+total+'</span>'+
       '</div>'
     );
-
     $('prog-fill').style.width=pct+'%';
     tx('rules-ct',myChk+' / '+total);
 
@@ -251,7 +275,7 @@ var Dash={
   copyInvite:function(){
     if(!S.pact)return;
     var code=S.pact.inviteCode;
-    if(navigator.clipboard){navigator.clipboard.writeText(code).then(function(){toast('Invite code copied! Share it with your partner 📋','success');});}
+    if(navigator.clipboard){navigator.clipboard.writeText(code).then(function(){toast('Invite code copied! 📋','success');});}
     else{var el=document.createElement('textarea');el.value=code;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);toast('Code copied!','success');}
   },
 
@@ -270,12 +294,12 @@ var Dash={
   },
 
   loadHistory:async function(){
-    var hb=$('hist-body');hb.innerHTML='<p style="color:#aaa;font-size:.83rem;padding:.5rem 0">Loading…</p>';
+    var hb=$('hist-body');hb.innerHTML='<p style="color:var(--muted);font-size:.83rem;padding:.5rem 0">Loading…</p>';
     try{
       var d=await api('GET','/api/pact/history');Dash._history=d.history;
       var hist=d.history,keys=Object.keys(hist).sort().reverse();
       var me=S.pact.me,partner=S.pact.partner,myId=me.userId,ptId=partner&&partner.userId;
-      if(!keys.length){hb.innerHTML='<p style="color:#aaa;font-size:.83rem;padding:.5rem 0">No history yet — check back after midnight.</p>';return;}
+      if(!keys.length){hb.innerHTML='<p style="color:var(--muted);font-size:.83rem;padding:.5rem 0">No history yet — check back after midnight.</p>';return;}
       var t='<table class="htbl"><thead><tr><th>Date</th><th>'+esc(me.name||'Me')+'</th><th>Fine</th><th>'+esc((partner&&(partner.nickname||partner.name))||'Partner')+'</th><th>Fine</th></tr></thead><tbody>';
       keys.forEach(function(k){
         var row=hist[k],m=row[myId]||{checked:0,total:25,fineAmount:0,finePaid:false},p=ptId?(row[ptId]||{checked:0,total:25,fineAmount:0,finePaid:false}):null;
@@ -309,7 +333,6 @@ var Dash={
       var ol=$('set-rules-ol');ol.innerHTML='';
       pact.rules.forEach(function(r,i){var li=document.createElement('li');li.innerHTML='<input class="ri field" data-i="'+i+'" value="'+esc(r)+'" maxlength="120"/>';ol.appendChild(li);});
     }else{sec.classList.add('hidden');}
-    document.querySelectorAll('.panel').forEach(function(p){p.style.background=S.theme==='dark'?'var(--navy)':'var(--cream)';});
   },
 
   saveNick:async function(){
